@@ -2,48 +2,11 @@
 import numpy as np
 
 BOARD_SIZE = 7
+BOARD_SHAPE = (BOARD_SIZE, BOARD_SIZE)
 ZERO_BOARD = np.zeros(BOARD_SIZE ** 2, dtype=np.int)
 INDEX_BOARD = np.array([i for i in range(BOARD_SIZE ** 2)])
-CELLS = {1: 'A', 0: '.', -1: 'B'}
-
-
-def get_winners():
-    """ Get all possible win combinations """
-
-    def row_winners():
-        """ All win combinations of the row """
-        return [row[i:i + 4] for i in range(len(row) - 3)]
-
-    def get_rows(board):
-        """ All rows, columns and diagonals of the board """
-        board = board.reshape(BOARD_SIZE, BOARD_SIZE)
-        board_flip = np.fliplr(board)
-        rows = [board[0]]
-        cols = [board[:, 0]]
-        diags1 = [board.diagonal(0)]
-        diags2 = [board_flip.diagonal(0)]
-        for i in range(1, BOARD_SIZE):
-            rows.append(board[i])
-            cols.append(board[:, i])
-            if BOARD_SIZE - i >= 4:
-                diags1.append(board.diagonal(i))
-                diags1.append(board.diagonal(-i))
-                diags2.append(board_flip.diagonal(i))
-                diags2.append(board_flip.diagonal(-i))
-        res = []
-        res.extend(rows)
-        res.extend(cols)
-        res.extend(diags1)
-        res.extend(diags2)
-        return res
-
-    winners = []
-    for row in get_rows(INDEX_BOARD):
-        winners.extend(row_winners())
-    return winners
-
-
-WINNERS = get_winners()
+PIECES = {1: 'A', 0: '.', -1: 'B'}
+WINNERS = []
 
 
 class Game:
@@ -51,11 +14,14 @@ class Game:
     border or in a cell that has a non-empty neighbor """
 
     def __init__(self):
+        global WINNERS
+        if len(WINNERS) == 0:
+            # Initialize win combinations
+            WINNERS = Game._get_winners()
         self.current_player = 1
         self.state = State(ZERO_BOARD.copy(), 1)
         self.name = 'four_in_a_row'
-        self.grid_shape = (BOARD_SIZE, BOARD_SIZE)
-        self.input_shape = (2, BOARD_SIZE, BOARD_SIZE)
+        self.input_shape = (2,) + BOARD_SHAPE
         self.state_size = len(self.state.binary)
         self.action_size = len(ZERO_BOARD)
 
@@ -67,11 +33,11 @@ class Game:
 
     def turn(self, action):
         """ Take turn"""
-        next_state, value, finished = self.state.make_turn(action)
-        self.state = next_state
+        new_state, value, finished = self.state.make_turn(action)
+        self.state = new_state
         self.current_player = -self.current_player
         info = None
-        return next_state, value, finished, info
+        return new_state, value, finished, info
 
     @staticmethod
     def identities(state, action_values):
@@ -95,12 +61,48 @@ class Game:
     @staticmethod
     def _mirror_horizontal(array):
         """ Horizontal mirror image of the array matrix """
-        return np.ravel(np.fliplr(array.reshape(BOARD_SIZE, BOARD_SIZE)))
+        return np.ravel(np.fliplr(array.reshape(BOARD_SHAPE)))
 
     @staticmethod
     def _mirror_vertical(array):
         """ Vertical mirror image of the array matrix """
-        return np.ravel(np.flipud(array.reshape(BOARD_SIZE, BOARD_SIZE)))
+        return np.ravel(np.flipud(array.reshape(BOARD_SHAPE)))
+
+    @staticmethod
+    def _get_winners():
+        """ Get all possible win combinations for the defined board size """
+
+        def get_rows(board):
+            """ All rows, columns and diagonals of the board """
+            board = board.reshape(BOARD_SHAPE)
+            board_flip = np.fliplr(board)
+            rows = [board[0]]
+            cols = [board[:, 0]]
+            diags1 = [board.diagonal(0)]
+            diags2 = [board_flip.diagonal(0)]
+            for i in range(1, BOARD_SIZE):
+                rows.append(board[i])
+                cols.append(board[:, i])
+                if BOARD_SIZE - i >= 4:
+                    diags1.append(board.diagonal(i))
+                    diags1.append(board.diagonal(-i))
+                    diags2.append(board_flip.diagonal(i))
+                    diags2.append(board_flip.diagonal(-i))
+            res = []
+            res.extend(rows)
+            res.extend(cols)
+            res.extend(diags1)
+            res.extend(diags2)
+            return res
+
+        def row_winners():
+            """ All win combinations of the row """
+            return [row[i:i + 4] for i in range(len(row) - 3)]
+
+        winners = []
+        for row in get_rows(INDEX_BOARD):
+            winners.extend(row_winners())
+        return winners
 
 
 class State:
@@ -130,9 +132,9 @@ class State:
 
     def render(self, logger):
         """ Print board to the logger output """
-        board = self.board.reshape(BOARD_SIZE, BOARD_SIZE)
+        board = self.board.reshape(BOARD_SHAPE)
         for row in board:
-            logger.info(' '.join(CELLS[x] for x in row))
+            logger.info(' '.join(PIECES[x] for x in row))
         logger.info('-' * (BOARD_SIZE * 2 - 1))
 
     def _get_allowed_actions(self):
@@ -199,3 +201,4 @@ class State:
 
     def _get_score(self):
         return self.value[1], self.value[2]
+

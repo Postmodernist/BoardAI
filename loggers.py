@@ -2,6 +2,12 @@ import logging
 from config import RUN_PATH
 
 
+class ConsoleLog:
+    @staticmethod
+    def info(msg):
+        print(msg)
+
+
 def create_logger(name, log_file, level=logging.INFO):
     formatter = logging.Formatter(
         fmt='%(asctime)s %(levelname)s %(message)s',
