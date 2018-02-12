@@ -5,16 +5,17 @@ from keras.layers import Input, Dense, Conv2D, Flatten, BatchNormalization, Leak
 from keras.models import load_model, Model
 from keras.optimizers import SGD
 
-import config
+import paths
 from loggers import log_model
 from loss import softmax_cross_entropy_with_logits
 
 
 class ResidualCnn:
 
-    def __init__(self, reg_const, learning_rate, input_dim, output_dim, hidden_layers):
+    def __init__(self, reg_const, learning_rate, momentum, input_dim, output_dim, hidden_layers):
         self.reg_const = reg_const
         self.learning_rate = learning_rate
+        self.momentum = momentum
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.hidden_layers = hidden_layers
@@ -32,14 +33,13 @@ class ResidualCnn:
 
     def write(self, version):
         """ Write model to file """
-        filename = 'models/version{0:0>4}.h5'.format(version)
-        self.model.save(config.RUN_PATH + filename)
+        path = '{}models/version{0:0>4}.h5'.format(paths.RUN, version)
+        self.model.save(path)
 
     @staticmethod
-    def read(game, run_number, version):
+    def read(path, version):
         """ Read model from file """
-        filename = 'models/version{0:0>4}.h5'.format(version)
-        path = config.RUN_ARCHIVE_PATH + game + '/run{0:0>4}/'.format(run_number) + filename
+        path = '{}models/version{0:0>4}.h5'.format(path, version)
         return load_model(path, custom_objects={'softmax_cross_entropy_with_logits': softmax_cross_entropy_with_logits})
 
     def print_weight_averages(self):
@@ -107,7 +107,7 @@ class ResidualCnn:
         ph = self._policy_head(x)
         model = Model(inputs=[main_input], outputs=[vh, ph])
         model.compile(loss={'value_head': 'mean_squared_error', 'policy_head': softmax_cross_entropy_with_logits},
-                      optimizer=SGD(lr=self.learning_rate, momentum=config.MOMENTUM),
+                      optimizer=SGD(lr=self.learning_rate, momentum=self.momentum),
                       loss_weights={'value_head': 0.5, 'policy_head': 0.5})
         return model
 

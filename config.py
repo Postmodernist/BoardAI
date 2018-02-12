@@ -1,12 +1,3 @@
-# Initialize
-INITIAL_RUN_NUMBER = None
-INITIAL_MEMORY_VERSION = None
-INITIAL_MODEL_VERSION = None
-
-# Paths
-RUN_PATH = './run/'
-RUN_ARCHIVE_PATH = './run_archive/'
-
 # Self play
 EPISODES = 30
 MCTS_SIMS = 50

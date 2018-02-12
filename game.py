@@ -41,32 +41,25 @@ class Game:
 
     @staticmethod
     def identities(state, action_values):
-        """ Original tuple (state, action_values) and its mirror images """
-        # Original state
+        """ Generate 8 symmetries of state and action_values arrays """
+
+        def make_identity(x, y):
+            return State(x.ravel(), state.player), y.ravel()
+
         identities = [(state, action_values)]
-        # Horizontal mirror
-        board = Game._mirror_horizontal(state.board)
-        act_val = Game._mirror_horizontal(action_values)
-        identities.append((State(board, state.player), act_val))
-        # Vertical mirror
-        board = Game._mirror_vertical(state.board)
-        act_val = Game._mirror_vertical(action_values)
-        identities.append((State(board, state.player), act_val))
-        # Vertical and horizontal mirror
-        board = np.flipud(state.board)
-        act_val = np.flipud(action_values)
-        identities.append((State(board, state.player), act_val))
+        board = state.board.reshape(BOARD_SHAPE)
+        av = action_values.reshape(BOARD_SHAPE)
+        board_m = np.fliplr(board)
+        av_m = np.fliplr(av)
+        identities.append(make_identity(board_m, av_m))
+        for _ in range(3):
+            board = np.rot90(board)
+            av = np.rot90(av)
+            board_m = np.rot90(board_m)
+            av_m = np.rot90(av_m)
+            identities.append(make_identity(board, av))
+            identities.append(make_identity(board_m, av_m))
         return identities
-
-    @staticmethod
-    def _mirror_horizontal(array):
-        """ Horizontal mirror image of the array matrix """
-        return np.ravel(np.fliplr(array.reshape(BOARD_SHAPE)))
-
-    @staticmethod
-    def _mirror_vertical(array):
-        """ Vertical mirror image of the array matrix """
-        return np.ravel(np.flipud(array.reshape(BOARD_SHAPE)))
 
     @staticmethod
     def _get_winners():
@@ -78,21 +71,21 @@ class Game:
             board_flip = np.fliplr(board)
             rows = [board[0]]
             cols = [board[:, 0]]
-            diags1 = [board.diagonal(0)]
-            diags2 = [board_flip.diagonal(0)]
+            diagonals1 = [board.diagonal(0)]
+            diagonals2 = [board_flip.diagonal(0)]
             for i in range(1, BOARD_SIZE):
                 rows.append(board[i])
                 cols.append(board[:, i])
                 if BOARD_SIZE - i >= 4:
-                    diags1.append(board.diagonal(i))
-                    diags1.append(board.diagonal(-i))
-                    diags2.append(board_flip.diagonal(i))
-                    diags2.append(board_flip.diagonal(-i))
+                    diagonals1.append(board.diagonal(i))
+                    diagonals1.append(board.diagonal(-i))
+                    diagonals2.append(board_flip.diagonal(i))
+                    diagonals2.append(board_flip.diagonal(-i))
             res = []
             res.extend(rows)
             res.extend(cols)
-            res.extend(diags1)
-            res.extend(diags2)
+            res.extend(diagonals1)
+            res.extend(diagonals2)
             return res
 
         def row_winners():
@@ -201,4 +194,3 @@ class State:
 
     def _get_score(self):
         return self.value[1], self.value[2]
-
