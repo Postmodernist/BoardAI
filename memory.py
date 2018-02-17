@@ -14,9 +14,5 @@ class Memory:
             self.short_memory.append(item)
 
     def commit_long_memory(self):
-        for x in self.short_memory:
-            self.long_memory.append(x)
-        self.clear_short_memory()
-
-    def clear_short_memory(self):
-        self.short_memory = deque(maxlen=self.memory_size)
+        self.long_memory.extend(self.short_memory)
+        self.short_memory.clear()

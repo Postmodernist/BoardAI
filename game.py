@@ -1,4 +1,3 @@
-""" Game description classes can be replaced by any other game that complies to the same API """
 import numpy as np
 
 BOARD_SIZE = 7
@@ -11,7 +10,8 @@ WINNERS = []
 
 class Game:
     """ Four-in-a-row game. First player to get 4 marks in a straight line wins. Mark can be placed only on the
-    border or in a cell that has a non-empty neighbor """
+    border or in a cell that has a non-empty neighbor. Game class can be replaced by any other game that complies
+    to the same API """
 
     def __init__(self):
         global WINNERS
@@ -31,9 +31,9 @@ class Game:
         self.state = State(ZERO_BOARD.copy(), 1)
         return self.state
 
-    def turn(self, action):
-        """ Take turn"""
-        new_state, value, finished = self.state.make_turn(action)
+    def make_move(self, action):
+        """ Make a move """
+        new_state, value, finished = self.state.make_move(action)
         self.state = new_state
         self.current_player = -self.current_player
         info = None
@@ -113,7 +113,15 @@ class State:
         self.value = self._get_value()
         self.score = self._get_score()
 
-    def make_turn(self, action):
+    def __str__(self):
+        s = ''
+        board = self.board.reshape(BOARD_SHAPE)
+        for row in board:
+            s += ' '.join(PIECES[x] for x in row) + '\n'
+        s += '-' * (BOARD_SIZE * 2 - 1)
+        return s
+
+    def make_move(self, action):
         """ Make a turn """
         new_board = self.board.copy()
         new_board[action] = self.player
@@ -122,13 +130,6 @@ class State:
         if new_state.finished:
             value = new_state.value[0]
         return new_state, value, new_state.finished
-
-    def render(self, logger):
-        """ Print board to the logger output """
-        board = self.board.reshape(BOARD_SHAPE)
-        for row in board:
-            logger.info(' '.join(PIECES[x] for x in row))
-        logger.info('-' * (BOARD_SIZE * 2 - 1))
 
     def _get_allowed_actions(self):
         """ Get all actions that can be taken in current state """

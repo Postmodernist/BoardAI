@@ -1,16 +1,22 @@
+import time
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pylab as pl
+from IPython import display
 from keras import regularizers
 from keras.layers import Input, Dense, Conv2D, Flatten, BatchNormalization, LeakyReLU, add
 from keras.models import load_model, Model
 from keras.optimizers import SGD
 
+import config
 import paths
 from loggers import log_model
-from loss import softmax_cross_entropy_with_logits
+from loss import softmax_cross_entropy_with_logits as softmax_loss
 
 
 class ResidualCnn:
+    """ Neural net that makes predictions about the value and actions probabilities for a given game state """
 
     def __init__(self, reg_const, learning_rate, momentum, input_dim, output_dim, hidden_layers):
         self.reg_const = reg_const
@@ -21,29 +27,43 @@ class ResidualCnn:
         self.hidden_layers = hidden_layers
         self.num_layers = len(hidden_layers)
         self.model = self._build_model()
+        self.train_overall_loss = []
+        self.train_value_loss = []
+        self.train_policy_loss = []
+        self.val_overall_loss = []
+        self.val_value_loss = []
+        self.val_policy_loss = []
 
-    def predict(self, x):
+    def predict(self, state):
         """ Make a prediction """
-        return self.model.predict(x)
+        inputs = np.array([self._state_to_model_input(state)])
+        return self.model.predict(inputs)
 
-    def fit(self, states, targets, epochs, verbose, validation_split, batch_size):
-        """ Fit model """
-        return self.model.fit(states, targets, epochs=epochs, verbose=verbose, validation_split=validation_split,
-                              batch_size=batch_size)
-
-    def write(self, version):
-        """ Write model to file """
-        path = '{}models/version{0:0>4}.h5'.format(paths.RUN, version)
-        self.model.save(path)
-
-    @staticmethod
-    def read(path, version):
-        """ Read model from file """
-        path = '{}models/version{0:0>4}.h5'.format(path, version)
-        return load_model(path, custom_objects={'softmax_cross_entropy_with_logits': softmax_cross_entropy_with_logits})
-
-    def print_weight_averages(self):
-        """ Log layers stats """
+    def retrain(self, memory):
+        """ Retrain model """
+        log_model.info('Retraining model...')
+        for i in range(config.TRAINING_LOOPS):
+            mini_batch = np.random.choice(memory, min(config.BATCH_SIZE, len(memory)), replace=False)
+            training_states = np.array([self._state_to_model_input(row['state'])] for row in mini_batch)
+            training_targets = {
+                'value_head': np.array([row['value'] for row in mini_batch]),
+                'policy_head': np.array([row['action_values'] for row in mini_batch])}
+            fit = self.model.fit(training_states, training_targets, epochs=config.EPOCHS, verbose=1, validation_split=0,
+                                 batch_size=32)
+            log_model.info('New loss %s', fit.history)
+            self.train_overall_loss.append(round(fit.history['loss'][config.EPOCHS - 1], 4))
+            self.train_value_loss.append(round(fit.history['value_head_loss'][config.EPOCHS - 1], 4))
+            self.train_policy_loss.append(round(fit.history['policy_head_loss'][config.EPOCHS - 1], 4))
+        # Plot losses
+        plt.plot(self.train_overall_loss, 'k')
+        plt.plot(self.train_value_loss, 'k:')
+        plt.plot(self.train_policy_loss, 'k--')
+        plt.legend(['train_overall_loss', 'train_value_loss', 'train_policy_loss'], loc='lower left')
+        display.clear_output(wait=True)
+        display.display(pl.gcf())
+        pl.gcf().clear()
+        time.sleep(1.0)
+        # Log weights averages
         layers = self.model.layers
         for i, layer in enumerate(layers):
             try:
@@ -60,6 +80,17 @@ class ResidualCnn:
             except IndexError:
                 pass
         log_model.info('-' * 80)
+
+    @staticmethod
+    def read(path, version):
+        """ Read model from file """
+        path = '{}models/version{0:0>4}.h5'.format(path, version)
+        return load_model(path, custom_objects={'softmax_cross_entropy_with_logits': softmax_loss})
+
+    def write(self, version):
+        """ Write model to file """
+        path = '{}models/version{0:0>4}.h5'.format(paths.RUN, version)
+        self.model.save(path)
 
     def view_layers(self):
         """ Plot model weights"""
@@ -94,9 +125,6 @@ class ResidualCnn:
                     except IndexError:
                         pass
 
-    def state_to_model_input(self, state):
-        return state.binary.reshape(self.input_dim)
-
     def _build_model(self):
         main_input = Input(shape=self.input_dim, name='main_input')
         x = self._conv_layer(main_input, self.hidden_layers[0]['filters'], self.hidden_layers[0]['kernel_size'])
@@ -106,7 +134,7 @@ class ResidualCnn:
         vh = self._value_head(x)
         ph = self._policy_head(x)
         model = Model(inputs=[main_input], outputs=[vh, ph])
-        model.compile(loss={'value_head': 'mean_squared_error', 'policy_head': softmax_cross_entropy_with_logits},
+        model.compile(loss={'value_head': 'mean_squared_error', 'policy_head': softmax_loss},
                       optimizer=SGD(lr=self.learning_rate, momentum=self.momentum),
                       loss_weights={'value_head': 0.5, 'policy_head': 0.5})
         return model
@@ -148,3 +176,6 @@ class ResidualCnn:
         x = Dense(self.output_dim, use_bias=False, activation='linear',
                   kernel_regularizer=regularizers.l2(self.reg_const), name='policy_head')(x)
         return x
+
+    def _state_to_model_input(self, state):
+        return state.binary.reshape(self.input_dim)
