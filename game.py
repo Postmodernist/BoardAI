@@ -5,7 +5,7 @@ BOARD_SHAPE = (BOARD_SIZE, BOARD_SIZE)
 ZERO_BOARD = np.zeros(BOARD_SIZE ** 2, dtype=np.int)
 INDEX_BOARD = np.array([i for i in range(BOARD_SIZE ** 2)])
 PIECES = {1: 'A', 0: '.', -1: 'B'}
-WINNERS = []
+WIN_POSITIONS = []
 
 
 class Game:
@@ -14,20 +14,19 @@ class Game:
     to the same API """
 
     def __init__(self):
-        global WINNERS
-        if len(WINNERS) == 0:
+        global WIN_POSITIONS
+        if len(WIN_POSITIONS) == 0:
             # Initialize win combinations
-            WINNERS = Game._get_winners()
-        self.current_player = 1
+            WIN_POSITIONS = Game._get_win_positions()
         self.state = State(ZERO_BOARD.copy(), 1)
         self.name = 'four_in_a_row'
+        self.board_shape = BOARD_SHAPE
         self.input_shape = (2,) + BOARD_SHAPE
         self.state_size = len(self.state.binary)
         self.action_size = len(ZERO_BOARD)
 
     def reset(self):
         """ Reset game """
-        self.current_player = 1
         self.state = State(ZERO_BOARD.copy(), 1)
         return self.state
 
@@ -35,9 +34,7 @@ class Game:
         """ Make a move """
         new_state, value, finished = self.state.make_move(action)
         self.state = new_state
-        self.current_player = -self.current_player
-        info = None
-        return new_state, value, finished, info
+        return new_state, value, finished
 
     @staticmethod
     def identities(state, action_values):
@@ -62,7 +59,7 @@ class Game:
         return identities
 
     @staticmethod
-    def _get_winners():
+    def _get_win_positions():
         """ Get all possible win combinations for the defined board size """
 
         def get_rows(board):
@@ -88,14 +85,14 @@ class Game:
             res.extend(diagonals2)
             return res
 
-        def row_winners():
+        def row_win_positions():
             """ All win combinations of the row """
             return [row[i:i + 4] for i in range(len(row) - 3)]
 
-        winners = []
+        win_positions = []
         for row in get_rows(INDEX_BOARD):
-            winners.extend(row_winners())
-        return winners
+            win_positions.extend(row_win_positions())
+        return win_positions
 
 
 class State:
@@ -105,6 +102,7 @@ class State:
     def __init__(self, board, player):
         self.board = board
         self.player = player
+        self.pieces = PIECES
         self.allowed_actions = self._get_allowed_actions()
         self.opponent_won = self._did_opponent_win()
         self.finished = self._is_finished()
@@ -128,7 +126,7 @@ class State:
         new_state = State(new_board, -self.player)
         value = 0
         if new_state.finished:
-            value = new_state.value[0]
+            value = new_state.value
         return new_state, value, new_state.finished
 
     def _get_allowed_actions(self):
@@ -156,7 +154,7 @@ class State:
 
     def _did_opponent_win(self):
         """ Return True if opponent made a winning move """
-        for w in WINNERS:
+        for w in WIN_POSITIONS:
             if sum(self.board[w]) == 4 * -self.player:
                 return True  # last turn resulted in a win combination
         return False
@@ -190,8 +188,11 @@ class State:
     def _get_value(self):
         """ The value of the state for the current player, i.e. if the opponent played a winning move, you lose """
         if self.opponent_won:
-            return -1, -1, 1
-        return 0, 0, 0
+            return -1
+        return 0
 
     def _get_score(self):
-        return self.value[1], self.value[2]
+        """ Score change for player and opponent """
+        if self.opponent_won:
+            return -1, 1
+        return 0, 0

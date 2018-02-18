@@ -36,7 +36,7 @@ class ResidualCnn:
 
     def predict(self, state):
         """ Make a prediction """
-        inputs = np.array([self._state_to_model_input(state)])
+        inputs = np.array([self.state_to_model_input(state)])
         return self.model.predict(inputs)
 
     def retrain(self, memory):
@@ -44,7 +44,7 @@ class ResidualCnn:
         log_model.info('Retraining model...')
         for i in range(config.TRAINING_LOOPS):
             mini_batch = np.random.choice(memory, min(config.BATCH_SIZE, len(memory)), replace=False)
-            training_states = np.array([self._state_to_model_input(row['state'])] for row in mini_batch)
+            training_states = np.array([self.state_to_model_input(row['state'])] for row in mini_batch)
             training_targets = {
                 'value_head': np.array([row['value'] for row in mini_batch]),
                 'policy_head': np.array([row['action_values'] for row in mini_batch])}
@@ -80,6 +80,9 @@ class ResidualCnn:
             except IndexError:
                 pass
         log_model.info('-' * 80)
+
+    def state_to_model_input(self, state):
+        return state.binary.reshape(self.input_dim)
 
     @staticmethod
     def read(path, version):
@@ -176,6 +179,3 @@ class ResidualCnn:
         x = Dense(self.output_dim, use_bias=False, activation='linear',
                   kernel_regularizer=regularizers.l2(self.reg_const), name='policy_head')(x)
         return x
-
-    def _state_to_model_input(self, state):
-        return state.binary.reshape(self.input_dim)

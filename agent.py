@@ -15,11 +15,18 @@ class Agent(Player):
         self.mcts = None
 
     def make_move(self, state, stochastic=True):
-        """ Run MCTS to evaluate potential actions, then choose action either stochastically or deterministically """
+        """ Run MCTS to evaluate potential actions, then choose most promising action
+        :type state                 game.State
+        :param stochastic           choose action stochastically or deterministically
+        :rtype action               int
+        :rtype actions_prob_dist    1D array of size action_size
+        :rtype mcts_action_value    float
+        :rtype nn_action_value      float
+        """
         # Setup MCTS tree
         if self.mcts is None or state.id not in self.mcts.tree:
             log_mcts.info('Building new MCTS tree for agent %s', self.name)
-            self.mcts = Mcts(state, self.nn)
+            self.mcts = Mcts(state, self.nn, self.action_size)
         else:
             log_mcts.info('Setting root of MCTS tree to %s for agent %s', state.id, self.name)
             self.mcts.root = self.mcts.tree[state.id]
@@ -41,10 +48,13 @@ class Agent(Player):
         return action, actions_prob_dist, mcts_action_value, nn_action_value
 
     def _get_action_values(self):
-        """ Values of root actions """
+        """ Values and probabilities of root actions
+        :rtype action_values        1D array of size action_size
+        :rtype actions_prob_dist    1D array of size action_size
+        """
         edges = self.mcts.root.edges
         visit_counts = np.zeros(self.action_size, dtype=np.integer)
-        actions_values = np.zeros(self.action_size, dtype=np.float32)
+        actions_values = np.zeros(self.action_size, dtype=np.float64)
         for action, edge in edges:
             visit_counts[action] = edge.stats['N']
             actions_values[action] = edge.stats['Q']
@@ -54,11 +64,17 @@ class Agent(Player):
 
     @staticmethod
     def _choose_action(actions_values, actions_prob_dist, stochastic=True):
-        """ Choose action either stochastically or deterministically """
+        """ Choose action
+        :type actions_values        1D array of size action_size
+        :type actions_prob_dist     1D array of size action_size
+        :param stochastic           if True then choose stochastically, otherwise -- deterministically
+        :rtype action               int
+        :rtype action_value         float
+        """
         if stochastic:
-            # Choose stochastically using actions probabilities distribution
-            actions_one_hot = np.random.multinomial(1, actions_prob_dist)
-            action = np.where(actions_one_hot)[0][0]  # index of a non-zero element
+            # Choose stochastically using actions probability distribution
+            action_one_hot = np.random.multinomial(1, actions_prob_dist)
+            action = np.where(action_one_hot)[0][0]  # index of a non-zero element
         else:
             # Choose deterministically
             actions = np.argwhere(actions_prob_dist == max(actions_prob_dist))

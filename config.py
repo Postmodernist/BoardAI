@@ -2,7 +2,7 @@
 EPISODES = 30
 MCTS_SIMULATIONS = 50
 MEMORY_SIZE = 30000
-TURNS_UNTIL_TAU0 = 10  # on this turn start playing deterministically
+STOCHASTIC_TURNS = 10
 CPUCT = 1
 EPSILON = 0.2
 ALPHA = 0.8
