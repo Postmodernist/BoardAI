@@ -21,13 +21,27 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 np.set_printoptions(suppress=True)
 
 
-def main():
+def test_play():
+    """ Play a custom set of games with chosen opponents """
+    res = play_custom(
+        env=Game(),
+        run_number=0,
+        player1_ver=-1,  # -1 for human player
+        player2_ver=-1,  # -1 for human player
+        episodes=3,  # number of games
+        logger=log_tournament,
+        stochastic_turns=0)
+    print(res[:3])
+
+
+def train_model():
     log_main.info('=' * 40)
     log_main.info('New log')
     log_main.info('=' * 40)
 
-    # Create an untrained neural network objects from the config file
     env = Game()
+
+    # Create an untrained neural network objects from the config file
     args_nn = (
         config.REG_CONST,  # regularization constant
         config.LEARNING_RATE,  # learning rate
@@ -70,8 +84,8 @@ def main():
     plot_model(current_nn.model, to_file=paths.RUN + 'models/model.png', show_shapes=True)
 
     # Create the players
-    current_player = Agent('current_player', env.action_size, current_nn)
-    best_player = Agent('best_player', env.action_size, best_nn)
+    current_player = Agent('Current_player', env.action_size, current_nn)
+    best_player = Agent('Best_player', env.action_size, best_nn)
     # human_player = HumanPlayer('human_player', env.action_size)
 
     iteration = 0
@@ -83,11 +97,11 @@ def main():
         print('Iteration number: ' + str(iteration))
         print('Best player version: ' + str(best_player_version))
         print('Self playing ' + str(config.EPISODES) + ' episodes...')
-        _, _, _, memory = play_matches(
+        _, _, _, memory = play(
             player1=best_player,
             player2=best_player,
             episodes=config.EPISODES,
-            log=log_main,
+            logger=log_main,
             stochastic_turns=config.STOCHASTIC_TURNS,
             memory=memory)
         print()
@@ -119,11 +133,11 @@ def main():
                 log_memory.info(mem['state'])
             # Tournament
             print('Playing tournament...')
-            win_counts, sp_win_counts, score_history, _ = play_matches(
+            win_counts, sp_win_counts, score_history, _ = play(
                 player1=best_player,
                 player2=current_player,
                 episodes=config.EVAL_EPISODES,
-                log=log_tournament,
+                logger=log_tournament,
                 stochastic_turns=0,
                 memory=None)
             print('Win counts')
@@ -142,7 +156,7 @@ def main():
             print('Memory size: ' + str(len(memory.long_memory)))
 
 
-def play_matches_between_versions(env, run_number, player1_ver, player2_ver, episodes, log, stochastic_turns):
+def play_custom(env, run_number, player1_ver, player2_ver, episodes, logger, stochastic_turns):
     """ Play matches between specific versions of agents and/or human players """
 
     def create_player(version, name):
@@ -166,38 +180,41 @@ def play_matches_between_versions(env, run_number, player1_ver, player2_ver, epi
             player = Agent(name, env.action_size, agent_nn)
         return player
 
-    player1 = create_player(player1_ver, 'player1')
-    player2 = create_player(player2_ver, 'player2')
-    return play_matches(player1, player2, episodes, log, stochastic_turns, memory=None)
+    player1 = create_player(player1_ver, 'Player1')
+    player2 = create_player(player2_ver, 'Player2')
+    return play(player1, player2, episodes, logger, stochastic_turns, memory=None)
 
 
-def play_matches(player1, player2, episodes, log, stochastic_turns, memory):
+def play(player1, player2, episodes, logger, stochastic_turns, memory):
     """ Play matches between player1 and player2 """
+
+    def log_actions_prob_dist():
+        n_rows = env.board_shape[0]
+        row_len = env.board_shape[1]
+        for row in range(n_rows):
+            logger.info(['----' if prob == 0 else '{:.2f}'.format(prob)
+                         for prob in actions_prob_dist[row_len * row: row_len * (row + 1)]])
+
     env = Game()
     win_counts = {player1.name: 0, player2.name: 0, 'draw': 0}
     sp_win_counts = {'sp': 0, 'nsp': 0, 'draw': 0}  # starting / non-starting players
     score_history = {player1.name: [], player2.name: []}  # win is +1 point, loss is -1 point, draw is 0
 
     for episode in range(episodes):
-        log.info('::: Episode %d of %d :::', episode + 1, episodes)
-        print(episode + 1, end=' ')
+        logger.info('::: Episode %d of %d :::', episode + 1, episodes)
         player1.mcts = None
         player2.mcts = None
-        first_player = random.choice([1, -1])
-        if first_player == 1:
-            players = {1: player1, -1: player2}
-            log.info('%s goes first', player1.name)
-        else:
-            players = {-1: player1, 1: player2}
-            log.info('%s goes first', player2.name)
+        first = random.choice([1, -1])
+        players = {first: player1, -first: player2}
         state = env.reset()
-        log.info(env.state)
         turn = 0
         finished = False
+        env.state.log(logger)
 
         while not finished:
+            logger.info('%s\'s turn', players[state.player].name)
             turn += 1
-            # Run the MCTS and return an action
+            # Get player's action
             stochastic = turn < stochastic_turns
             action, actions_prob_dist, mcts_value, nn_value = players[state.player].make_move(state, stochastic)
             if memory is not None:
@@ -205,18 +222,18 @@ def play_matches(player1, player2, episodes, log, stochastic_turns, memory):
                 identities = env.identities(state, actions_prob_dist)
                 memory.commit_short_memory(identities)
             # Log actions probability distribution
-            log.info('Action: %d', action)
-            n_rows = env.board_shape[0]
-            row_len = env.board_shape[1]
-            for row in range(n_rows):
-                log.info(['----' if prob == 0 else '{:.2f}'.format(prob)
-                          for prob in actions_prob_dist[row_len * row: row_len * (row + 1)]])
-            log.info('MCTS perceived value for %s: %f', state.pieces[state.player], np.round(mcts_value, 2))
-            log.info('NN perceived value for %s: %f', state.pieces[state.player], np.round(nn_value, 2))
+            logger.info('Action: %d', action)
+
+            if actions_prob_dist is not None:
+                log_actions_prob_dist()
+            if mcts_value is not None:
+                logger.info('MCTS perceived value for %s: %f', state.pieces[state.player], np.round(mcts_value, 2))
+            if nn_value is not None:
+                logger.info('NN perceived value for %s: %f', state.pieces[state.player], np.round(nn_value, 2))
             # Make the move. The value of the new state from the POV of the new player, i.e. -1 if
             # the previous player played a winning move or 0 otherwise
             state, value, finished = env.make_move(action)
-            log.info(env.state)
+            env.state.log(logger)
 
         # Assign the values correctly to the game moves
         if memory is not None:
@@ -229,22 +246,22 @@ def play_matches(player1, player2, episodes, log, stochastic_turns, memory):
 
         # Update win counters and scores
         if value == -1:
-            log.info('%s wins', players[-state.player].name)
+            logger.info('%s wins', players[-state.player].name)
             win_counts[players[-state.player].name] += 1
             if state.player == 1:
                 sp_win_counts['nsp'] += 1
             else:
                 sp_win_counts['sp'] += 1
         else:
-            log.info('Game draw')
+            logger.info('Game draw')
             win_counts['draw'] += 1
             sp_win_counts['draw'] += 1
         score_history[players[state.player].name].append(state.score[0])
         score_history[players[-state.player].name].append(state.score[1])
-        log.info('-' * 20)
+        logger.info('')
 
     return win_counts, sp_win_counts, score_history, memory
 
 
 if __name__ == '__main__':
-    main()
+    test_play()

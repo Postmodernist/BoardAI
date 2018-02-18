@@ -119,6 +119,12 @@ class State:
         s += '-' * (BOARD_SIZE * 2 - 1)
         return s
 
+    def log(self, log):
+        board = self.board.reshape(BOARD_SHAPE)
+        for row in board:
+            log.info(' '.join(PIECES[x] for x in row))
+        log.info('-' * (BOARD_SIZE * 2 - 1))
+
     def make_move(self, action):
         """ Make a turn """
         new_board = self.board.copy()

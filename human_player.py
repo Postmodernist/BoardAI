@@ -11,9 +11,8 @@ class HumanPlayer(Player):
 
     def make_move(self, state, stochastic):
         """ Request the player to input action """
+        print(state)
         action = -1
         while action not in state.allowed_actions:
-            action = input('Enter your action: ')
-        prob_i = np.zeros(self.action_size)
-        prob_i[action] = 1
-        return action, prob_i, None, None
+            action = int(input(self.name + ': '))
+        return action, None, None, None
