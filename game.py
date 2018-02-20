@@ -1,11 +1,42 @@
 import numpy as np
 
-BOARD_SIZE = 7
-BOARD_SHAPE = (BOARD_SIZE, BOARD_SIZE)
-ZERO_BOARD = np.zeros(BOARD_SIZE ** 2, dtype=np.int)
-INDEX_BOARD = np.array([i for i in range(BOARD_SIZE ** 2)])
-PIECES = {1: 'A', 0: '.', -1: 'B'}
-WIN_POSITIONS = []
+# Board
+BOARD_SIDE = 7
+BOARD_SIZE = BOARD_SIDE ** 2
+BOARD_SHAPE = (BOARD_SIDE, BOARD_SIDE)
+ZERO_BOARD = np.zeros(BOARD_SIZE, dtype=np.int)
+INDEX_BOARD = np.arange(BOARD_SIZE)
+PIECES = {1: 'A', -1: 'B', 0: '.'}
+
+
+def get_win_positions():
+    """ Get all possible win combinations for the board """
+
+    def get_rows(board):
+        """ All rows, columns and diagonals of the board """
+        board = board.reshape(BOARD_SHAPE)
+        board_flip = np.fliplr(board)
+        rows = [board[0]]
+        cols = [board[:, 0]]
+        diagonals1 = [board.diagonal(0)]
+        diagonals2 = [board_flip.diagonal(0)]
+        for i in range(1, BOARD_SIDE):
+            rows.append(board[i])
+            cols.append(board[:, i])
+            if BOARD_SIDE - i >= 4:
+                diagonals1.append(board.diagonal(i))
+                diagonals1.append(board.diagonal(-i))
+                diagonals2.append(board_flip.diagonal(i))
+                diagonals2.append(board_flip.diagonal(-i))
+        return rows + cols + diagonals1 + diagonals2
+
+    win_positions = []
+    for row in get_rows(INDEX_BOARD):
+        win_positions.extend([row[i:i + 4] for i in range(len(row) - 3)])
+    return win_positions
+
+
+WIN_POSITIONS = get_win_positions()
 
 
 class Game:
@@ -13,17 +44,14 @@ class Game:
     border or in a cell that has a non-empty neighbor. Game class can be replaced by any other game that complies
     to the same API """
 
+    name = 'four_in_a_row'
+    board_size = BOARD_SIZE
+    board_shape = BOARD_SHAPE
+    input_shape = (2,) + BOARD_SHAPE
+    pieces = PIECES
+
     def __init__(self):
-        global WIN_POSITIONS
-        if len(WIN_POSITIONS) == 0:
-            # Initialize win combinations
-            WIN_POSITIONS = Game._get_win_positions()
         self.state = State(ZERO_BOARD.copy(), 1)
-        self.name = 'four_in_a_row'
-        self.board_shape = BOARD_SHAPE
-        self.input_shape = (2,) + BOARD_SHAPE
-        self.state_size = len(self.state.binary)
-        self.action_size = len(ZERO_BOARD)
 
     def reset(self):
         """ Reset game """
@@ -32,67 +60,30 @@ class Game:
 
     def make_move(self, action):
         """ Make a move """
-        new_state, value, finished = self.state.make_move(action)
-        self.state = new_state
-        return new_state, value, finished
+        self.state = self.state.make_move(action)
+        return self.state
 
     @staticmethod
-    def identities(state, action_values):
-        """ Generate 8 symmetries of state and action_values arrays """
+    def identities(state, actions_values):
+        """ Generate 8 symmetries of state and actions_values arrays """
 
         def make_identity(x, y):
             return State(x.ravel(), state.player), y.ravel()
 
-        identities = [(state, action_values)]
+        identities = [(state, actions_values)]
         board = state.board.reshape(BOARD_SHAPE)
-        av = action_values.reshape(BOARD_SHAPE)
+        av = actions_values.reshape(BOARD_SHAPE)
         board_m = np.fliplr(board)
         av_m = np.fliplr(av)
         identities.append(make_identity(board_m, av_m))
         for _ in range(3):
             board = np.rot90(board)
             av = np.rot90(av)
+            identities.append(make_identity(board, av))
             board_m = np.rot90(board_m)
             av_m = np.rot90(av_m)
-            identities.append(make_identity(board, av))
             identities.append(make_identity(board_m, av_m))
         return identities
-
-    @staticmethod
-    def _get_win_positions():
-        """ Get all possible win combinations for the defined board size """
-
-        def get_rows(board):
-            """ All rows, columns and diagonals of the board """
-            board = board.reshape(BOARD_SHAPE)
-            board_flip = np.fliplr(board)
-            rows = [board[0]]
-            cols = [board[:, 0]]
-            diagonals1 = [board.diagonal(0)]
-            diagonals2 = [board_flip.diagonal(0)]
-            for i in range(1, BOARD_SIZE):
-                rows.append(board[i])
-                cols.append(board[:, i])
-                if BOARD_SIZE - i >= 4:
-                    diagonals1.append(board.diagonal(i))
-                    diagonals1.append(board.diagonal(-i))
-                    diagonals2.append(board_flip.diagonal(i))
-                    diagonals2.append(board_flip.diagonal(-i))
-            res = []
-            res.extend(rows)
-            res.extend(cols)
-            res.extend(diagonals1)
-            res.extend(diagonals2)
-            return res
-
-        def row_win_positions():
-            """ All win combinations of the row """
-            return [row[i:i + 4] for i in range(len(row) - 3)]
-
-        win_positions = []
-        for row in get_rows(INDEX_BOARD):
-            win_positions.extend(row_win_positions())
-        return win_positions
 
 
 class State:
@@ -102,7 +93,6 @@ class State:
     def __init__(self, board, player):
         self.board = board
         self.player = player
-        self.pieces = PIECES
         self.allowed_actions = self._get_allowed_actions()
         self.opponent_won = self._did_opponent_win()
         self.finished = self._is_finished()
@@ -116,44 +106,42 @@ class State:
         board = self.board.reshape(BOARD_SHAPE)
         for row in board:
             s += ' '.join(PIECES[x] for x in row) + '\n'
-        s += '-' * (BOARD_SIZE * 2 - 1)
+        s += '-' * (BOARD_SIDE * 2 - 1)
         return s
 
-    def log(self, log):
+    def log(self, logger):
+        """ Print board to log """
         board = self.board.reshape(BOARD_SHAPE)
         for row in board:
-            log.info(' '.join(PIECES[x] for x in row))
-        log.info('-' * (BOARD_SIZE * 2 - 1))
+            logger.info(' '.join(PIECES[x] for x in row))
+        logger.info('-' * (BOARD_SIDE * 2 - 1))
 
     def make_move(self, action):
         """ Make a turn """
-        new_board = self.board.copy()
-        new_board[action] = self.player
-        new_state = State(new_board, -self.player)
-        value = 0
-        if new_state.finished:
-            value = new_state.value
-        return new_state, value, new_state.finished
+        board = self.board.copy()
+        board[action] = self.player
+        state = State(board, -self.player)
+        return state
 
     def _get_allowed_actions(self):
         """ Get all actions that can be taken in current state """
 
         def is_valid_action(action):
             # Out of range
-            if action < 0 or action >= len(self.board):
+            if action < 0 or action >= BOARD_SIZE:
                 return False
             # Cell is not empty
             if self.board[action] != 0:
                 return False
             # Cell is next to the border
-            if action < BOARD_SIZE \
-                    or action >= len(self.board) - BOARD_SIZE \
-                    or action % BOARD_SIZE == BOARD_SIZE - 1 \
-                    or action % BOARD_SIZE == 0:
+            if action < BOARD_SIDE \
+                    or action >= len(self.board) - BOARD_SIDE \
+                    or action % BOARD_SIDE == BOARD_SIDE - 1 \
+                    or action % BOARD_SIDE == 0:
                 return True
             # Cell has non-empty neighbor
-            neighbors = [action - 1, action + 1, action - BOARD_SIZE, action + BOARD_SIZE, action - BOARD_SIZE - 1,
-                         action - BOARD_SIZE + 1, action + BOARD_SIZE - 1, action + BOARD_SIZE + 1]
+            neighbors = [action - 1, action + 1, action - BOARD_SIDE, action + BOARD_SIDE, action - BOARD_SIDE - 1,
+                         action - BOARD_SIDE + 1, action + BOARD_SIDE - 1, action + BOARD_SIDE + 1]
             return any(map(lambda x: self.board[x] != 0, neighbors))
 
         return list(filter(is_valid_action, INDEX_BOARD))
@@ -171,23 +159,23 @@ class State:
 
     def _state_to_id(self):
         """ Convert board state to string id, which is a concatenation of two arrays of 0/1 corresponding to board
-        positions occupied by each player """
+        positions occupied by player A and player B """
         # Player 1 positions
-        player1_positions = np.zeros(len(self.board), dtype=np.int)
+        player1_positions = ZERO_BOARD.copy()
         player1_positions[self.board == 1] = 1
         # Player 2 positions
-        player2_positions = np.zeros(len(self.board), dtype=np.int)
+        player2_positions = ZERO_BOARD.copy()
         player2_positions[self.board == -1] = 1
         # Concatenate both arrays
-        position = np.append(player1_positions, player2_positions)
-        return ''.join(map(str, position))
+        positions = np.append(player1_positions, player2_positions)
+        return ''.join(map(str, positions))
 
     def _get_binary(self):
         """ Convert board state to a concatenation of two arrays of 0/1 corresponding to board positions occupied by
         current player and opponent """
-        player_positions = np.zeros(len(self.board), dtype=np.int)
+        player_positions = ZERO_BOARD.copy()
         player_positions[self.board == self.player] = 1
-        opponent_positions = np.zeros(len(self.board), dtype=np.int)
+        opponent_positions = ZERO_BOARD.copy()
         opponent_positions[self.board == -self.player] = 1
         return np.append(player_positions, opponent_positions)
 

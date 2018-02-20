@@ -1,17 +1,13 @@
-import time
-
 import matplotlib.pyplot as plt
 import numpy as np
-import pylab as pl
-from IPython import display
 from keras import regularizers
 from keras.layers import Input, Dense, Conv2D, Flatten, BatchNormalization, LeakyReLU, add
 from keras.models import load_model, Model
 from keras.optimizers import SGD
 
 import config
+import log
 import paths
-from loggers import log_model
 from loss import softmax_cross_entropy_with_logits as softmax_loss
 
 
@@ -30,56 +26,38 @@ class ResidualCnn:
         self.train_overall_loss = []
         self.train_value_loss = []
         self.train_policy_loss = []
-        self.val_overall_loss = []
-        self.val_value_loss = []
-        self.val_policy_loss = []
 
     def predict(self, state):
-        """ Make a prediction """
+        """ Get state value and opponent move probability distribution predictions from NN
+        :type state                         game.State
+        :rtype state_value                  float
+        :rtype allowed_actions_prob_dist    1D array of size len(state.allowed_actions)
+        """
         inputs = np.array([self.state_to_model_input(state)])
-        return self.model.predict(inputs)
+        predictions = self.model.predict(inputs)
+        state_value = predictions[0][0][0]
+        logits = predictions[1][0]
+        odds = np.exp(logits[state.allowed_actions])  # mask invalid actions
+        allowed_actions_prob_dist = odds / np.sum(odds)  # normalize
+        return state_value, allowed_actions_prob_dist
 
-    def retrain(self, memory):
+    def retrain(self, long_memory):
         """ Retrain model """
-        log_model.info('Retraining model...')
         for i in range(config.TRAINING_LOOPS):
-            mini_batch = np.random.choice(memory, min(config.BATCH_SIZE, len(memory)), replace=False)
-            training_states = np.array([self.state_to_model_input(row['state'])] for row in mini_batch)
+            mini_batch = np.random.choice(long_memory, min(config.BATCH_SIZE, len(long_memory)), replace=False)
+            training_states = np.array([self.state_to_model_input(item['state']) for item in mini_batch])
             training_targets = {
-                'value_head': np.array([row['value'] for row in mini_batch]),
-                'policy_head': np.array([row['action_values'] for row in mini_batch])}
-            fit = self.model.fit(training_states, training_targets, epochs=config.EPOCHS, verbose=1, validation_split=0,
-                                 batch_size=32)
-            log_model.info('New loss %s', fit.history)
+                'value_head': np.array([item['value'] for item in mini_batch]),
+                'policy_head': np.array([item['actions_values'] for item in mini_batch])}
+            # Train model
+            fit = self.model.fit(training_states, training_targets, epochs=config.EPOCHS, verbose=1,
+                                 validation_split=0, batch_size=32)
+            log.model.info('New loss {}'.format(fit.history))
             self.train_overall_loss.append(round(fit.history['loss'][config.EPOCHS - 1], 4))
             self.train_value_loss.append(round(fit.history['value_head_loss'][config.EPOCHS - 1], 4))
             self.train_policy_loss.append(round(fit.history['policy_head_loss'][config.EPOCHS - 1], 4))
-        # Plot losses
-        plt.plot(self.train_overall_loss, 'k')
-        plt.plot(self.train_value_loss, 'k:')
-        plt.plot(self.train_policy_loss, 'k--')
-        plt.legend(['train_overall_loss', 'train_value_loss', 'train_policy_loss'], loc='lower left')
-        display.clear_output(wait=True)
-        display.display(pl.gcf())
-        pl.gcf().clear()
-        time.sleep(1.0)
-        # Log weights averages
-        layers = self.model.layers
-        for i, layer in enumerate(layers):
-            try:
-                x = layer.get_weights()[0]
-                log_model.info('Weight layer %d: mean_abs = %f, std =%f, max_abs =%f, min_abs =%f',
-                               i, np.mean(np.abs(x)), np.std(x), np.max(np.abs(x)), np.min(np.abs(x)))
-            except IndexError:
-                pass
-        for i, layer in enumerate(layers):
-            try:
-                x = layer.get_weights()[1]
-                log_model.info('Bias layer %d: mean_abs = %f, std =%f, max_abs =%f, min_abs =%f',
-                               i, np.mean(np.abs(x)), np.std(x), np.max(np.abs(x)), np.min(np.abs(x)))
-            except IndexError:
-                pass
-        log_model.info('-' * 80)
+        self._plot_train_losses()
+        self._log_weight_averages()
 
     def state_to_model_input(self, state):
         return state.binary.reshape(self.input_dim)
@@ -87,12 +65,12 @@ class ResidualCnn:
     @staticmethod
     def read(path, version):
         """ Read model from file """
-        path = '{}models/version{0:0>4}.h5'.format(path, version)
+        path = '{}models/version{:04}.h5'.format(path, version)
         return load_model(path, custom_objects={'softmax_cross_entropy_with_logits': softmax_loss})
 
     def write(self, version):
         """ Write model to file """
-        path = '{}models/version{0:0>4}.h5'.format(paths.RUN, version)
+        path = '{}models/version{:04}.h5'.format(paths.RUN, version)
         self.model.save(path)
 
     def view_layers(self):
@@ -111,20 +89,20 @@ class ResidualCnn:
                     sub.imshow(weights[:, :, w_channel, w_filter], cmap='coolwarm', clim=(-1, 1), aspect="auto")
                     w_channel = (w_channel + 1) % weights.shape[2]
                     w_filter = (w_filter + 1) % weights.shape[3]
-                plt.show()
+                plt.savefig('{}plots/layers.png'.format(paths.RUN))
             except IndexError:
                 try:
                     fig = plt.figure(figsize=(3, len(layer_weights)))  # width, height in inches
                     for j in range(len(layer_weights)):
                         sub = fig.add_subplot(len(layer_weights), 1, j + 1)
                         sub.imshow([layer_weights[j]], cmap='coolwarm', clim=(0, 2), aspect="auto")
-                    plt.show()
+                    plt.savefig('{}plots/layers.png'.format(paths.RUN))
                 except IndexError:
                     try:
                         fig = plt.figure(figsize=(3, 3))  # width, height in inches
                         sub = fig.add_subplot(1, 1, 1)
                         sub.imshow(layer_weights[0], cmap='coolwarm', clim=(-1, 1), aspect="auto")
-                        plt.show()
+                        plt.savefig('{}plots/layers.png'.format(paths.RUN))
                     except IndexError:
                         pass
 
@@ -179,3 +157,30 @@ class ResidualCnn:
         x = Dense(self.output_dim, use_bias=False, activation='linear',
                   kernel_regularizer=regularizers.l2(self.reg_const), name='policy_head')(x)
         return x
+
+    def _plot_train_losses(self):
+        """ Plot training losses """
+        plt.plot(self.train_overall_loss, 'k')
+        plt.plot(self.train_value_loss, 'k:')
+        plt.plot(self.train_policy_loss, 'k--')
+        plt.legend(['Loss', 'Value loss', 'Policy loss'], loc='lower left')
+        plt.savefig('{}plots/train_losses.png'.format(paths.RUN))
+
+    def _log_weight_averages(self):
+        """ Log weights averages """
+        layers = self.model.layers
+        for i, layer in enumerate(layers):
+            w = layer.get_weights()
+            if len(w) < 1:
+                continue
+            w = w[0]
+            log.model.info('Layer {}: mean_abs = {}, std = {}, max_abs = {}, min_abs = {}'
+                           .format(i, np.mean(np.abs(w)), np.std(w), np.max(np.abs(w)), np.min(np.abs(w))))
+        for i, layer in enumerate(layers):
+            w = layer.get_weights()
+            if len(w) < 2:
+                continue
+            w = w[1]
+            log.model.info('Bias {}: mean_abs = {}, std = {}, max_abs = {}, min_abs = {}'
+                           .format(i, np.mean(np.abs(w)), np.std(w), np.max(np.abs(w)), np.min(np.abs(w))))
+        log.model.info('')

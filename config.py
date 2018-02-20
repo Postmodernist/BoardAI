@@ -1,11 +1,12 @@
 # Self play
-EPISODES = 30
-MCTS_SIMULATIONS = 50
-MEMORY_SIZE = 30000
-STOCHASTIC_TURNS = 10
-CPUCT = 1
-EPSILON = 0.2
-ALPHA = 0.8
+STOP_TRAINING = False  # change to True and save to stop training loop
+EPISODES = 30  # number of self-play games
+MCTS_SIMULATIONS = 50  # number of MCTS simulations
+MEMORY_SIZE = 30000  # memory size threshold to trigger neural net retraining
+STOCHASTIC_TURNS = 10  # number of stochastic turns before switching to deterministic
+C = 1  # coefficient of second term of probabilistic UCT
+EPSILON = 0.2  # exploration noise influence
+ALPHA = 0.8  # dirichlet noise generation parameter
 
 # Retraining
 BATCH_SIZE = 256
@@ -24,4 +25,7 @@ HIDDEN_CNN_LAYERS = [
 
 # Evaluation
 EVAL_EPISODES = 20
-SCORING_THRESHOLD = 1.3
+SCORING_THRESHOLD = 1.3  # current player must be this much better than the best player
+
+# Misc
+PLOT_MODEL_GRAPH = False

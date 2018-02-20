@@ -1,7 +1,7 @@
 import numpy as np
 
 import config
-from loggers import log_mcts
+import log
 
 
 class Node:
@@ -24,16 +24,15 @@ class Edge:
         self.action = action
         self.id = in_node.state.id + '|' + out_node.state.id
         self.player = in_node.state.player
-        self.stats = {'N': 0, 'W': 0, 'Q': 0, 'P': prior}
+        self.stats = {'N': 1, 'W': 0, 'Q': 0, 'P': prior}
 
 
 class Mcts:
     """ Monte Carlo tree search facility """
 
-    def __init__(self, state, nn, action_size):
+    def __init__(self, state, nn):
         self.root = Node(state)
         self.nn = nn
-        self.action_size = action_size
         self.tree = {}
         self._add_node(self.root)
 
@@ -42,90 +41,71 @@ class Mcts:
 
     def simulate(self):
         """ Move to leaf node, evaluate it, and back propagate the value """
-        log_mcts.info('Root node: %s', self.root.state.id)
-        log_mcts.info(self.root.state)
-        log_mcts.info('Current player: %d', self.root.state.player)
-        # Move to the leaf node
-        leaf, leaf_state_value, finished, root_to_leaf_edges = self._move_to_leaf()
-        log_mcts.info(leaf.state)
-        # Evaluate the leaf node
-        log_mcts.info('Evaluating leaf...')
-        if not finished:
-            leaf_state_value, allowed_actions_prob_dist = self.get_nn_predictions(leaf.state)
-            log_mcts.info('Predicted value for player %d: %f', leaf.state.player, leaf_state_value)
-            # Expand the leaf node
+        log.mcts.info('Root node: {}'.format(self.root.state.id))
+        log.mcts.info('Current player: {}'.format(self.root.state.player))
+        log.mcts.info('Moving to leaf...')
+        leaf, root_to_leaf_edges = self._move_to_leaf()
+        leaf_state_value = leaf.state.value
+        log.mcts.info('Evaluating leaf...')
+        if not leaf.state.finished:
+            leaf_state_value, allowed_actions_prob_dist = self.nn.predict(leaf.state)
+            log.mcts.info('Predicted value for player {}: {}'.format(leaf.state.player, leaf_state_value))
+            log.mcts.info('Expanding leaf...')
             self._expand_node(leaf, allowed_actions_prob_dist)
         else:
-            log_mcts.info('Game value for player %d: %f', leaf.player, leaf_state_value)
-        # Back propagate the leaf node state value through the tree
+            log.mcts.info('Final game value for player {}: {}'.format(leaf.state.player, leaf_state_value))
+        log.mcts.info('Back propagating leaf state value...')
         self._back_propagate(leaf, leaf_state_value, root_to_leaf_edges)
-
-    def get_nn_predictions(self, state):
-        """ Get state value and opponent move probability distribution predictions from NN
-        :type state                         game.State
-        :rtype state_value                  float
-        :rtype allowed_actions_prob_dist    1D array of size len(state.allowed_actions)
-        """
-        predictions = self.nn.predict(state)
-        state_value = predictions[0][0]
-        logits = predictions[1][0]
-        # Mask invalid actions and normalize
-        odds = np.exp(logits[state.allowed_actions])
-        allowed_actions_prob_dist = odds / np.sum(odds)
-        return state_value, allowed_actions_prob_dist
 
     def _move_to_leaf(self):
         """ Move down the tree until hit the leaf node """
-        log_mcts.info('Moving to leaf')
         node = self.root
-        node_state_value = 0
-        finished = False
         root_to_leaf_edges = []
         while node.edges:
-            log_mcts.info('Player %d turn...', node.state.player)
-            max_qu = -99999
+            log.mcts.info('Player {} turn'.format(node.state.player))
+            max_qu_sum = -99999
+            simulation_action = None
+            simulation_edge = None
+            # Setup UCT function parameters
             if node == self.root:
                 epsilon = config.EPSILON
                 nu = np.random.dirichlet([config.ALPHA] * len(node.edges))  # exploration noise
             else:
                 epsilon = 0
                 nu = [0] * len(node.edges)
-            nn = 0
-            for action, edge in node.edges:
-                nn += edge.stats['N']
-            for idx, (action, edge) in enumerate(node.edges):
-                u = config.CPUCT * ((1 - epsilon) * edge.stats['P'] + epsilon * nu[idx]) * np.sqrt(nn) / (
-                        1 + edge.stats['N'])
+            total_visits = sum(edge.stats['N'] for _, edge in node.edges) or 1
+            # Search most promising action
+            for i, (action, edge) in enumerate(node.edges):
                 q = edge.stats['Q']
-                log_mcts.info('Action: %d ... N = %d, P = %f, nu = %f, adjP = %f, W = %f, Q = %f, U = %f, Q + U = %f',
-                              action, edge.stats['N'], round(edge.stats['P'], 6), round(nu[idx], 6),
-                              ((1 - epsilon) * edge.stats['P'] + epsilon * nu[idx]), round(edge.stats['W'], 6),
-                              round(q, 6), round(u, 6), round(q + u, 6))
-                if q + u > max_qu:
-                    max_qu = q + u
+                p = (1 - epsilon) * edge.stats['P'] + epsilon * nu[i]  # add noise to P
+                u = config.C * p * np.sqrt(np.log(total_visits) / (1 + edge.stats['N']))
+                qu_sum = q + u  # probabilistic upper confidence tree score
+                log.mcts.info(
+                    'Action {:2}: N {:2}, P {:.4f}, nu {:.4f}, P\' {:.4f}, W {:.4f}, Q {:.4f}, U {:.4f}, Q + U {:.4f}'
+                        .format(action, edge.stats['N'], edge.stats['P'], nu[i], p, edge.stats['W'], q, u, qu_sum))
+                if qu_sum > max_qu_sum:
+                    max_qu_sum = qu_sum
                     simulation_action = action
                     simulation_edge = edge
-            log_mcts.info('Action with highest Q + U... %d', simulation_action)
+            log.mcts.info('Action with highest Q + U: {}'.format(simulation_action))
             # The value of the new state from the POV of the new player
-            _, node_state_value, finished = node.state.make_move(simulation_action)
             node = simulation_edge.out_node
             root_to_leaf_edges.append(simulation_edge)
-        log_mcts('Finished... %d', finished)
-        return node, node_state_value, finished, root_to_leaf_edges
+        log.mcts.info('Game finished: {}'.format(node.state.finished))
+        return node, root_to_leaf_edges
 
     def _expand_node(self, leaf_node, allowed_actions_prob_dist):
         """ Expand node """
-        log_mcts.info('Expanding leaf...')
         for i, action in enumerate(leaf_node.state.allowed_actions):
-            new_state, _, _ = leaf_node.state.make_move(action)
+            new_state = leaf_node.state.make_move(action)
             # Add node if necessary
             if new_state.id not in self.tree:
                 new_node = Node(new_state)
                 self._add_node(new_node)
-                log_mcts.info('Added node %s, p = %f', new_node.state.id, allowed_actions_prob_dist[i])
+                log.mcts.info('New node {}, P = {:.6f}'.format(new_node.state.id, allowed_actions_prob_dist[i]))
             else:
                 new_node = self.tree[new_state.id]
-                log_mcts.info('Existing node %s', new_node.state.id)
+                log.mcts.info('Old node {}'.format(new_node.state.id))
             # Add edge
             new_edge = Edge(leaf_node, new_node, allowed_actions_prob_dist[i], action)
             leaf_node.add_edge(action, new_edge)
@@ -133,7 +113,6 @@ class Mcts:
     @staticmethod
     def _back_propagate(leaf, state_value, root_to_leaf_edges):
         """ Back propagate leaf state value up the tree """
-        log_mcts.info('Back propagating leaf state value...')
         current_player = leaf.state.player
         for edge in root_to_leaf_edges:
             player = edge.player
@@ -141,12 +120,12 @@ class Mcts:
                 sign = 1
             else:
                 sign = -1
+            old_state_value = edge.stats['W']
             edge.stats['N'] += 1
             edge.stats['W'] += state_value * sign
             edge.stats['Q'] = edge.stats['W'] / edge.stats['N']
-            log_mcts.info('Updating edge with value %f for player %d... N = %d, W = %f, Q = %f',
-                          state_value * sign, player, edge.stats['N'], edge.stats['W'], edge.stats['Q'])
-            log_mcts.info(edge.out_node.state)
+            log.mcts.info('Updating edge with value {} for player {}: N = {}, W = {}, Q = {}'.format(
+                old_state_value, player, edge.stats['N'], edge.stats['W'], edge.stats['Q']))
 
     def _add_node(self, node):
         """ Add node to the MCTS tree """

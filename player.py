@@ -1,12 +1,9 @@
-import numpy as np
-
-
 class Player:
     """ Player interface """
 
-    def __init__(self, name, action_size):
+    def __init__(self, name, board_size):
         self.name = name
-        self.action_size = action_size
+        self.board_size = board_size
 
     def make_move(self, state, stochastic):
         """ Return intended move data """
