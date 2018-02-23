@@ -32,7 +32,7 @@ def get_win_positions():
 
     win_positions = []
     for row in get_rows(INDEX_BOARD):
-        win_positions.extend([row[i:i + 4] for i in range(len(row) - 3)])
+        win_positions.extend([row[j:j + 4] for j in range(len(row) - 3)])
     return win_positions
 
 
@@ -41,8 +41,7 @@ WIN_POSITIONS = get_win_positions()
 
 class Game:
     """ Four-in-a-row game. First player to get 4 marks in a straight line wins. Mark can be placed only on the
-    border or in a cell that has a non-empty neighbor. Game class can be replaced by any other game that complies
-    to the same API """
+    border or in a cell that has a non-empty neighbor """
 
     name = 'four_in_a_row'
     board_size = BOARD_SIZE
@@ -64,25 +63,26 @@ class Game:
         return self.state
 
     @staticmethod
-    def identities(state, actions_values):
-        """ Generate 8 symmetries of state and actions_values arrays """
+    def identities(state, actions_prob_dist):
+        """ Generate 8 symmetries """
 
         def make_identity(x, y):
             return State(x.ravel(), state.player), y.ravel()
 
-        identities = [(state, actions_values)]
+        identities = []
         board = state.board.reshape(BOARD_SHAPE)
-        av = actions_values.reshape(BOARD_SHAPE)
+        apd = actions_prob_dist.reshape(BOARD_SHAPE)
+        identities.append(make_identity(board, apd))
         board_m = np.fliplr(board)
-        av_m = np.fliplr(av)
-        identities.append(make_identity(board_m, av_m))
+        apd_m = np.fliplr(apd)
+        identities.append(make_identity(board_m, apd_m))
         for _ in range(3):
             board = np.rot90(board)
-            av = np.rot90(av)
-            identities.append(make_identity(board, av))
+            apd = np.rot90(apd)
+            identities.append(make_identity(board, apd))
             board_m = np.rot90(board_m)
-            av_m = np.rot90(av_m)
-            identities.append(make_identity(board_m, av_m))
+            apd_m = np.rot90(apd_m)
+            identities.append(make_identity(board_m, apd_m))
         return identities
 
 
@@ -94,7 +94,7 @@ class State:
         self.board = board
         self.player = player
         self.allowed_actions = self._get_allowed_actions()
-        self.opponent_won = self._did_opponent_win()
+        self.opponent_won = self._opponent_won()
         self.finished = self._is_finished()
         self.id = self._state_to_id()
         self.binary = self._get_binary()
@@ -135,7 +135,7 @@ class State:
                 return False
             # Cell is next to the border
             if action < BOARD_SIDE \
-                    or action >= len(self.board) - BOARD_SIDE \
+                    or action >= BOARD_SIZE - BOARD_SIDE \
                     or action % BOARD_SIDE == BOARD_SIDE - 1 \
                     or action % BOARD_SIDE == 0:
                 return True
@@ -146,7 +146,7 @@ class State:
 
         return list(filter(is_valid_action, INDEX_BOARD))
 
-    def _did_opponent_win(self):
+    def _opponent_won(self):
         """ Return True if opponent made a winning move """
         for w in WIN_POSITIONS:
             if sum(self.board[w]) == 4 * -self.player:

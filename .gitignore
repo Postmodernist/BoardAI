@@ -1,6 +1,8 @@
 __pycache__/
-*.py[cod]
-*$py.class
 venv/
+run/
 .idea
 .log
+*.py[cod]
+*$py.class
+

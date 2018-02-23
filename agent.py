@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 
 import config
@@ -39,11 +41,13 @@ class Agent(Player):
             log.mcts.info('')
             self.mcts.simulate()
         # Get actions values and probability distribution
-        actions_values, actions_prob_dist = self._get_actions_values()
+        action_values, actions_prob_dist = self._get_action_values_and_prob_dist()
         # Choose the action
-        action, mcts_action_value = Agent._choose_action(actions_values, actions_prob_dist, stochastic)
+        action = Agent._choose_action(actions_prob_dist, stochastic)
         # Make a move
         next_state = state.make_move(action)
+        # Write action stats to log
+        mcts_action_value = action_values[action]
         nn_action_value = -self.nn.predict(next_state)[0]
         log.mcts.info('')
         log.mcts.info('----- MCTS search results -----')
@@ -54,25 +58,24 @@ class Agent(Player):
         log.mcts.info('')
         return action, actions_prob_dist, mcts_action_value, nn_action_value
 
-    def _get_actions_values(self):
+    def _get_action_values_and_prob_dist(self):
         """ Values and probabilities of root actions
-        :rtype actions_values        1D array of size board_size
+        :rtype action_values        1D array of size board_size
         :rtype actions_prob_dist    1D array of size board_size
         """
         edges = self.mcts.root.edges
         visit_counts = np.zeros(self.board_size, dtype=np.integer)
-        actions_values = np.zeros(self.board_size, dtype=np.float64)
+        action_values = np.zeros(self.board_size, dtype=np.float64)
         for action, edge in edges:
             visit_counts[action] = edge.stats['N']
-            actions_values[action] = edge.stats['Q']
+            action_values[action] = edge.stats['Q']
         # Normalize visit counts, so that probabilities add up to 1
         actions_prob_dist = visit_counts / (np.sum(visit_counts) * 1.0)
-        return actions_values, actions_prob_dist
+        return action_values, actions_prob_dist
 
     @staticmethod
-    def _choose_action(actions_values, actions_prob_dist, stochastic=True):
+    def _choose_action(actions_prob_dist, stochastic=True):
         """ Choose action
-        :type actions_values        1D array of size board_size
         :type actions_prob_dist     1D array of size board_size
         :param stochastic           if True then choose stochastically, otherwise -- deterministically
         :rtype action               int
@@ -85,6 +88,5 @@ class Agent(Player):
         else:
             # Choose deterministically
             actions = np.argwhere(actions_prob_dist == max(actions_prob_dist)).T[0]
-            action = np.random.choice(actions)  # tie break
-        action_value = actions_values[action]
-        return action, action_value
+            action = random.choice(actions)  # tie break
+        return action

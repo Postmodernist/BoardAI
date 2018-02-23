@@ -11,5 +11,5 @@ class HumanPlayer(Player):
         """ Request the player to input action """
         action = -1
         while action not in state.allowed_actions:
-            action = int(input(self.name + ': '))
+            action = int(input('{}: '.format(state.allowed_actions)))
         return action, None, None, None
