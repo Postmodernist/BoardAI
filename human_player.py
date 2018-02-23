@@ -1,13 +1,14 @@
+from game import State
 from player import Player
 
 
 class HumanPlayer(Player):
     """ Player controlled by human """
 
-    def __init__(self, name, board_size):
-        super().__init__(name, board_size)
+    def __init__(self, name: str):
+        super().__init__(name)
 
-    def make_move(self, state, stochastic):
+    def make_move(self, state: State, _):
         """ Request the player to input action """
         action = -1
         while action not in state.allowed_actions:

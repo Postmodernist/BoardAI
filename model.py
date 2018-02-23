@@ -1,5 +1,6 @@
 import random
 import sys
+from collections import deque
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +12,7 @@ from keras.optimizers import SGD
 import config
 import log
 import paths
-from game import Game
+from game import Game, State
 from loss import softmax_cross_entropy_with_logits
 
 
@@ -31,11 +32,10 @@ class ResidualCnn:
         self.train_value_loss = []
         self.train_policy_loss = []
 
-    def predict(self, state):
-        """ Get state value and opponent move probability distribution predictions from NN
-        :type state                     game.State
-        :rtype state_value              float
-        :rtype actions_prob_dist        1D array of size output_dim
+    def predict(self, state: State):
+        """ Predict state value and actions probability distribution
+        :rtype state_value: float
+        :rtype actions_prob_dist: np.ndarray
         """
         inputs = np.array([self.state_to_model_input(state)])
         value_out, policy_out = self.model.predict(inputs)
@@ -48,10 +48,10 @@ class ResidualCnn:
         actions_prob_dist = odds / np.sum(odds)  # normalize
         return state_value, actions_prob_dist
 
-    def retrain(self, long_memory):
+    def retrain(self, memory: deque):
         """ Retrain model """
         for i in range(config.TRAINING_LOOPS):
-            mini_batch = random.sample(long_memory, min(config.BATCH_SIZE, len(long_memory)))
+            mini_batch = random.sample(memory, min(config.BATCH_SIZE, len(memory)))
             training_states = np.array([self.state_to_model_input(item['state']) for item in mini_batch])
             training_targets = {
                 'value_head': np.array([item['value'] for item in mini_batch]),
@@ -67,7 +67,7 @@ class ResidualCnn:
         self._plot_train_losses()
         self._log_weight_averages()
 
-    def state_to_model_input(self, state):
+    def state_to_model_input(self, state: State):
         return state.binary.reshape(self.input_dim)
 
     @staticmethod
@@ -76,7 +76,7 @@ class ResidualCnn:
                            config.HIDDEN_CNN_LAYERS)
 
     @staticmethod
-    def read(path, verbose=True):
+    def read(path: str, verbose=True):
         """ Read model from file """
         if verbose:
             print('Loading model... ', end='')
@@ -86,7 +86,7 @@ class ResidualCnn:
             print('done')
         return m
 
-    def write(self, path, verbose=True):
+    def write(self, path: str, verbose=True):
         """ Write model to file """
         if verbose:
             print('Saving model... ', end='')
@@ -96,7 +96,7 @@ class ResidualCnn:
             print('done')
 
     def view_layers(self):
-        """ Plot model weights"""
+        """ Plot model layers"""
         layers = self.model.layers
         for i, layer in enumerate(layers):
             layer_weights = layer.get_weights()
@@ -143,41 +143,70 @@ class ResidualCnn:
         return model
 
     def _conv_layer(self, x, filters, kernel_size):
-        x = Conv2D(filters=filters, kernel_size=kernel_size, padding='same', data_format="channels_first",
-                   activation='linear', use_bias=False, kernel_regularizer=regularizers.l2(self.reg_const))(x)
+        x = Conv2D(filters=filters,
+                   kernel_size=kernel_size,
+                   padding='same',
+                   data_format="channels_first",
+                   activation='linear',
+                   use_bias=False,
+                   kernel_regularizer=regularizers.l2(self.reg_const))(x)
         x = BatchNormalization(axis=1)(x)
         x = LeakyReLU()(x)
         return x
 
     def _residual_layer(self, input_block, filters, kernel_size):
         x = self._conv_layer(input_block, filters, kernel_size)
-        x = Conv2D(filters=filters, kernel_size=kernel_size, padding='same', data_format="channels_first",
-                   activation='linear', use_bias=False, kernel_regularizer=regularizers.l2(self.reg_const))(x)
+        x = Conv2D(filters=filters,
+                   kernel_size=kernel_size,
+                   padding='same',
+                   data_format="channels_first",
+                   activation='linear',
+                   use_bias=False,
+                   kernel_regularizer=regularizers.l2(self.reg_const))(x)
         x = BatchNormalization(axis=1)(x)
         x = add([input_block, x])
         x = LeakyReLU()(x)
         return x
 
     def _value_head(self, x):
-        x = Conv2D(filters=1, kernel_size=(1, 1), padding='same', data_format="channels_first", activation='linear',
-                   use_bias=False, kernel_regularizer=regularizers.l2(self.reg_const))(x)
+        x = Conv2D(filters=1,
+                   kernel_size=(1, 1),
+                   padding='same',
+                   data_format="channels_first",
+                   activation='linear',
+                   use_bias=False,
+                   kernel_regularizer=regularizers.l2(self.reg_const))(x)
         x = BatchNormalization(axis=1)(x)
         x = LeakyReLU()(x)
         x = Flatten()(x)
-        x = Dense(20, activation='linear', use_bias=False, kernel_regularizer=regularizers.l2(self.reg_const))(x)
+        x = Dense(units=20,
+                  activation='linear',
+                  use_bias=False,
+                  kernel_regularizer=regularizers.l2(self.reg_const))(x)
         x = LeakyReLU()(x)
-        x = Dense(1, activation='tanh', use_bias=False, kernel_regularizer=regularizers.l2(self.reg_const),
+        x = Dense(units=1,
+                  activation='tanh',
+                  use_bias=False,
+                  kernel_regularizer=regularizers.l2(self.reg_const),
                   name='value_head')(x)
         return x
 
     def _policy_head(self, x):
-        x = Conv2D(filters=2, kernel_size=(1, 1), padding='same', data_format="channels_first", activation='linear',
-                   use_bias=False, kernel_regularizer=regularizers.l2(self.reg_const))(x)
+        x = Conv2D(filters=2,
+                   kernel_size=(1, 1),
+                   padding='same',
+                   data_format="channels_first",
+                   activation='linear',
+                   use_bias=False,
+                   kernel_regularizer=regularizers.l2(self.reg_const))(x)
         x = BatchNormalization(axis=1)(x)
         x = LeakyReLU()(x)
         x = Flatten()(x)
-        x = Dense(self.output_dim, use_bias=False, activation='linear',
-                  kernel_regularizer=regularizers.l2(self.reg_const), name='policy_head')(x)
+        x = Dense(units=self.output_dim,
+                  use_bias=False,
+                  activation='linear',
+                  kernel_regularizer=regularizers.l2(self.reg_const),
+                  name='policy_head')(x)
         return x
 
     def _plot_train_losses(self):
@@ -189,7 +218,7 @@ class ResidualCnn:
         plt.savefig('{}plots/train_losses.png'.format(paths.RUN))
 
     def _log_weight_averages(self):
-        """ Log weights averages """
+        """ Write weights averages to log """
         layers = self.model.layers
         for i, layer in enumerate(layers):
             w = layer.get_weights()

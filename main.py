@@ -37,7 +37,7 @@ def train_model():
     # Save current config file to run folder
     copyfile('./config.py', '{}config.py'.format(paths.RUN))
     # Plot model
-    if config.PLOT_MODEL_GRAPH:
+    if not pathlib.Path('{}plots/model.png'.format(paths.RUN)).exists():
         print('Plotting model... ', end='')
         sys.stdout.flush()
         plot_model(current_nn.model, to_file='{}plots/model.png'.format(paths.RUN), show_shapes=True)
@@ -45,8 +45,8 @@ def train_model():
     # Create players
     print('Creating players... ', end='')
     sys.stdout.flush()
-    current_player = Agent('Current_player', Game.board_size, current_nn)
-    best_player = Agent('Best_player', Game.board_size, best_nn)
+    current_player = Agent('Current_player', current_nn)
+    best_player = Agent('Best_player', best_nn)
     print('done')
     print('----------------------------------------')
     # Collect memories
@@ -57,7 +57,6 @@ def train_model():
         while len(memory) < memory.size:
             play(env, best_player, best_player, config.TAU, memory)
             progress_bar(len(memory), memory.size)
-        print()
         # Save memory
         memory.write('{}memory/memory{:04}.p'.format(paths.RUN, 0))
     log.main.info('')
@@ -68,8 +67,6 @@ def train_model():
     while True:
         reload(log)
         reload(config)
-        if config.STOP_TRAINING:
-            break
         iteration += 1
         log.main.info('')
         log.main.info('----------------------------------------')
@@ -77,11 +74,11 @@ def train_model():
         log.main.info('Best player version: {}'.format(best_player_version))
         log.main.info('----------------------------------------')
         print('\nIteration {}'.format(iteration))
-        print('Best player version: {}'.format(best_player_version))
+        print('----------------------------------------')
         # Retrain the model
         best_player_version = retrain_model(current_player, best_player, best_player_version, memory)
         # Self play
-        print('\nSelf play')
+        print('\nSelf play | Best player version: {}'.format(best_player_version))
         batch_play(config.EPISODES, best_player, best_player, config.TAU, memory, log.main)
         # Save memory
         if iteration % 5 == 0:
@@ -110,10 +107,8 @@ def load_model():
         memory = Memory.create(config.MEMORY_SIZE)
     print('Creating untrained neural networks... ', end='')
     sys.stdout.flush()
-    args = (config.REG_CONST, config.LEARNING_RATE, config.MOMENTUM, Game.input_shape, Game.board_size,
-            config.HIDDEN_CNN_LAYERS)
-    current_nn = ResidualCnn(*args)
-    best_nn = ResidualCnn(*args)
+    current_nn = ResidualCnn.create()
+    best_nn = ResidualCnn.create()
     print('done')
     # Load model
     if initial.RUN_NUMBER is not None and initial.MODEL_VERSION is not None:
@@ -147,22 +142,16 @@ def play_custom(episodes: int, run_number: int, player1_ver: int, player2_ver: i
         """ Create a human player or an agent """
         if ver == -1:
             # Create a human player
-            player = HumanPlayer(name, Game.board_size)
+            player = HumanPlayer(name)
         else:
             # Create model for the player
-            agent_nn = ResidualCnn(
-                config.REG_CONST,
-                config.LEARNING_RATE,
-                config.MOMENTUM,
-                Game.input_shape,
-                Game.board_size,
-                config.HIDDEN_CNN_LAYERS)
+            agent_nn = ResidualCnn.create()
             # Load model weights
             if ver > 0:
                 path = '{}{}/run{:04}/models/version{:04}.h5'.format(paths.RUN_ARCHIVE, Game.name, run_number, ver)
                 model_tmp = ResidualCnn.read(path)
                 agent_nn.model.set_weights(model_tmp.get_weights())
-            player = Agent(name, Game.board_size, agent_nn)
+            player = Agent(name, agent_nn)
         return player
 
     player1 = create_player(player1_ver, 'Player1')
@@ -191,13 +180,10 @@ def batch_play(episodes: int, player1: Player, player2: Player, tau: int, memory
         logger.info('************ Episode {} of {} ************'.format(episode + 1, episodes))
         if verbose:
             progress_bar(episode + 1, episodes)
-        # Clear old MCTS trees
-        player1.mcts = None
-        player2.mcts = None
         # Shuffle players
         first = random.choice([1, -1])
         players = {first: player1, -first: player2}
-        # Play match
+        # Play a match
         state = play(env, players[1], players[-1], tau, memory, logger)
         # Update win counts
         if state.value == -1:
@@ -213,15 +199,19 @@ def batch_play(episodes: int, player1: Player, player2: Player, tau: int, memory
 def play(env: Game, player1: Player, player2: Player, tau: int, memory: Memory or None, logger=log.null):
     """ Play a single match between player1 and player2
     :param env      Game object
-    :param player1  Player object   
+    :param player1  Player object
     :param player2  Player object
     :param tau      Turns before start playing deterministically
     :param memory   Memory object
     :param logger   Logger to write games progress and stats
     :return state   Final game state
     """
+    # Reset game state
     state = env.reset()
     env.state.log(logger)
+    # Clear MCTS trees
+    player1.mcts = None
+    player2.mcts = None
     turn = 0
     # Make moves until game is finished
     while not state.finished:
@@ -235,7 +225,7 @@ def play(env: Game, player1: Player, player2: Player, tau: int, memory: Memory o
         action, actions_prob_dist, mcts_value, nn_value = player.make_move(state, stochastic)
         # Update memory
         if memory is not None:
-            identities = env.identities(state, actions_prob_dist)
+            identities = Game.identities(state, actions_prob_dist)
             memory.commit_short_memory(identities)
         # Write action to log
         if actions_prob_dist is not None:

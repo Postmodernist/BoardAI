@@ -46,6 +46,8 @@ def create_logger(name, log_file, level=logging.INFO):
 
 def print_actions_prob_dist(logger, actions_prob_dist):
     """ Log actions probability distribution """
+    if logger.disabled:
+        return
     n_rows = Game.board_shape[0]
     row_len = Game.board_shape[1]
     for row in range(n_rows):
