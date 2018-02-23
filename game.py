@@ -190,7 +190,7 @@ class State:
 
     def _state_to_id(self):
         """ Convert board state to id """
-        return hash(self.boards.tostring())
+        return hash(self.board.tostring())
 
     def _get_binary(self):
         """ Create model input containing 3 last board states + board with all zeros/ones for current player """
