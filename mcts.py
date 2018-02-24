@@ -41,6 +41,7 @@ class Mcts:
         return len(self.tree)
 
     def choose_action(self, state: State, stochastic=True):
+        """ Search for the most promising action """
         # Set root node
         if state.id not in self.tree:
             self._reset_tree(state)
@@ -64,11 +65,12 @@ class Mcts:
         log.mcts.info('')
         log.mcts.info('----- MCTS search results -----')
         print_actions_prob_dist(log.mcts, actions_prob_dist)
-        log.mcts.info('Action: {} | MCTS val: {:.6f} | RNN val: {:.6f}'.format(action, mcts_value, nn_value))
+        log.mcts.info('Action: {} | MCTS val: {:.6f} | NN val: {:.6f}'.format(action, mcts_value, nn_value))
         log.mcts.info('')
         return action, actions_prob_dist, mcts_value, nn_value
 
     def _reset_tree(self, state: State):
+        """ Reset MCTS tree """
         self.root = Node(state)
         self.tree = {}
         self._add_node(self.root)
@@ -133,10 +135,7 @@ class Mcts:
         for i, edge in enumerate(node.edges):
             q = edge.stats['Q']
             p = (1 - epsilon) * edge.stats['P'] + epsilon * nu[i]  # P with noise
-            if config.ALTERNATIVE_UCT:
-                u = config.C * p * np.sqrt(total_visits) / (1 + edge.stats['N'])
-            else:
-                u = config.C * p * np.sqrt(np.log(total_visits) / (1 + edge.stats['N']))
+            u = config.C * p * np.sqrt(np.log(total_visits) / (1 + edge.stats['N']))
             qu_sum = q + u  # probabilistic upper confidence tree score
             log.mcts.info(
                 'Action {:2}: N {:2}, P {:.4f}, nu {:.4f}, P\' {:.4f}, W {:.4f}, Q {:.4f}, U {:.4f}, Q + U {:.4f}'
@@ -148,7 +147,7 @@ class Mcts:
 
     def _expand_node(self, leaf: Node, actions_prob_dist: np.ndarray):
         """ Expand node """
-        for i, action in enumerate(leaf.state.allowed_actions):
+        for action in leaf.state.allowed_actions:
             new_state = leaf.state.make_move(action)
             # Add node if necessary
             if new_state.id not in self.tree:
@@ -167,10 +166,7 @@ class Mcts:
         """ Back propagate leaf state value up the tree """
         leaf_player = leaf.state.player
         for edge in root_to_leaf_edges:
-            if edge.player == leaf_player:
-                sign = 1
-            else:
-                sign = -1
+            sign = 1 if edge.player == leaf_player else -1
             old_state_value = edge.stats['W']
             edge.stats['N'] += 1
             edge.stats['W'] += state_value * sign

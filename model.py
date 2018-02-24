@@ -26,7 +26,6 @@ class ResidualCnn:
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.hidden_layers = hidden_layers
-        self.num_layers = len(hidden_layers)
         self.model = self._build_model()
         self.train_overall_loss = []
         self.train_value_loss = []
@@ -37,7 +36,7 @@ class ResidualCnn:
         :rtype state_value: float
         :rtype actions_prob_dist: np.ndarray
         """
-        inputs = np.array([self.state_to_model_input(state)])
+        inputs = np.array([self._state_to_model_input(state)])
         value_out, policy_out = self.model.predict(inputs)
         state_value = value_out[0][0]
         logits = policy_out[0]
@@ -52,7 +51,7 @@ class ResidualCnn:
         """ Retrain model """
         for i in range(config.TRAINING_LOOPS):
             mini_batch = random.sample(memory, min(config.BATCH_SIZE, len(memory)))
-            training_states = np.array([self.state_to_model_input(item['state']) for item in mini_batch])
+            training_states = np.array([self._state_to_model_input(item['state']) for item in mini_batch])
             training_targets = {
                 'value_head': np.array([item['value'] for item in mini_batch]),
                 'policy_head': np.array([item['actions_prob_dist'] for item in mini_batch])}
@@ -66,9 +65,6 @@ class ResidualCnn:
             self.train_policy_loss.append(round(fit.history['policy_head_loss'][config.EPOCHS - 1], 4))
         self._plot_train_losses()
         self._log_weight_averages()
-
-    def state_to_model_input(self, state: State):
-        return state.binary.reshape(self.input_dim)
 
     @staticmethod
     def create():
@@ -211,9 +207,9 @@ class ResidualCnn:
 
     def _plot_train_losses(self):
         """ Plot training losses """
-        plt.plot(self.train_overall_loss, 'k')
-        plt.plot(self.train_value_loss, 'k:')
-        plt.plot(self.train_policy_loss, 'k--')
+        plt.plot(self.train_overall_loss, 'k', linewidth=1.0)
+        plt.plot(self.train_value_loss, 'g', linewidth=1.0)
+        plt.plot(self.train_policy_loss, 'b', linewidth=1.0)
         plt.legend(['Loss', 'Value loss', 'Policy loss'], loc='lower left')
         plt.savefig('{}plots/train_losses.png'.format(paths.RUN))
 
@@ -235,3 +231,6 @@ class ResidualCnn:
             log.model.info('Bias {:2}: mean_abs = {:.6f}, std = {:.6f}, max_abs = {:.6f}, min_abs = {:.6f}'
                            .format(i, np.mean(np.abs(w)), np.std(w), np.max(np.abs(w)), np.min(np.abs(w))))
         log.model.info('')
+
+    def _state_to_model_input(self, state: State):
+        return state.binary.reshape(self.input_dim)

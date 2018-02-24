@@ -12,9 +12,8 @@ import config
 import initial
 import log
 import paths
-from agent import Agent
+from agents import Hel, Human
 from game import Game
-from human_player import HumanPlayer
 from log_utils import print_actions_prob_dist, progress_bar
 from memory import Memory
 from model import ResidualCnn
@@ -45,8 +44,8 @@ def train_model():
     # Create players
     print('Creating players... ', end='')
     sys.stdout.flush()
-    current_player = Agent('Current_player', current_nn)
-    best_player = Agent('Best_player', best_nn)
+    current_player = Hel('Current_player', current_nn)
+    best_player = Hel('Best_player', best_nn)
     print('done')
     print('----------------------------------------')
     # Collect memories
@@ -142,7 +141,7 @@ def play_custom(episodes: int, run_number: int, player1_ver: int, player2_ver: i
         """ Create a human player or an agent """
         if ver == -1:
             # Create a human player
-            player = HumanPlayer(name)
+            player = Human(name)
         else:
             # Create model for the player
             agent_nn = ResidualCnn.create()
@@ -151,7 +150,7 @@ def play_custom(episodes: int, run_number: int, player1_ver: int, player2_ver: i
                 path = '{}{}/run{:04}/models/version{:04}.h5'.format(paths.RUN_ARCHIVE, Game.name, run_number, ver)
                 model_tmp = ResidualCnn.read(path)
                 agent_nn.model.set_weights(model_tmp.get_weights())
-            player = Agent(name, agent_nn)
+            player = Hel(name, agent_nn)
         return player
 
     player1 = create_player(player1_ver, 'Player1')
@@ -234,7 +233,7 @@ def play(env: Game, player1: Player, player2: Player, tau: int, memory: Memory o
         if mcts_value is not None:
             action_msg = action_msg + ' | MCTS val {:.6f}'.format(mcts_value)
         if nn_value is not None:
-            action_msg = action_msg + ' | RNN val {:.6f}'.format(nn_value)
+            action_msg = action_msg + ' | NN val {:.6f}'.format(nn_value)
         logger.info(action_msg)
         # Make the move
         state = env.make_move(action)
