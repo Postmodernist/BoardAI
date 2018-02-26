@@ -101,29 +101,23 @@ class Mcts:
         root_to_leaf_edges = []
         while node.edges:
             log.mcts.info('Player {} turn'.format(node.state.player))
-            total_visits = sum(edge.stats['N'] for edge in node.edges)
-            if total_visits == 0:
-                # Choose by Q
-                chosen_edge = max(node.edges, key=lambda x: x.stats['Q'])
-            else:
-                # Choose by Q + U
-                chosen_edge = self._get_edge_with_max_qu(node, total_visits)
-            log.mcts.info('Action with highest Q + U: {}'.format(chosen_edge.action))
+            chosen_edge = self._get_edge_with_max_qu(node)
+            log.mcts.info('Chosen action: {}'.format(chosen_edge.action))
             node = chosen_edge.out_node
             root_to_leaf_edges.append(chosen_edge)
         log.mcts.info('Game is finished: {}'.format(node.state.finished))
         return node, root_to_leaf_edges
 
     @staticmethod
-    def _get_edge_with_max_qu(node: Node, total_visits: int):
-        """ Return node edge with max Q + U score
-            :param node             Node to examine
-            :param total_visits     Total number of simulations made from the node
-        """
+    def _get_edge_with_max_qu(node: Node):
+        """ Return node edge with max Q + U score """
+        total_visits = sum(edge.stats['N'] for edge in node.edges)
         max_qu_sum = -99999
         chosen_edge = None
         # Choose best edge
         for edge in node.edges:
+            if edge.stats['N'] == 0:
+                return edge
             q = edge.stats['Q']
             u = config.C * edge.stats['P'] * (math.log(total_visits) / (1 + edge.stats['N'])) ** 0.5
             qu_sum = q + u  # probabilistic upper confidence tree score

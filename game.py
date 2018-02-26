@@ -3,7 +3,7 @@ import numpy as np
 K = 2  # Number of boards to keep, must be > 1
 
 # Board
-BOARD_SIDE = 6
+BOARD_SIDE = 7
 BOARD_SIZE = BOARD_SIDE ** 2
 BOARD_SHAPE = (BOARD_SIDE, BOARD_SIDE)
 ZERO_BOARDS = np.zeros(BOARD_SIZE * K, dtype=np.int)  # K boards
