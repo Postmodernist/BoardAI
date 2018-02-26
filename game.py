@@ -1,10 +1,12 @@
 import numpy as np
 
+K = 2  # Number of boards to keep, must be > 1
+
 # Board
-BOARD_SIDE = 7
+BOARD_SIDE = 6
 BOARD_SIZE = BOARD_SIDE ** 2
 BOARD_SHAPE = (BOARD_SIDE, BOARD_SIDE)
-ZERO_BOARDS = np.zeros(BOARD_SIZE * 3, dtype=np.int)  # 3 boards
+ZERO_BOARDS = np.zeros(BOARD_SIZE * K, dtype=np.int)  # K boards
 ZERO_BOARD = np.zeros(BOARD_SIZE, dtype=np.int)
 ONE_BOARD = np.ones(BOARD_SIZE, dtype=np.int)
 INDEX_BOARD = np.arange(BOARD_SIZE)
@@ -69,7 +71,7 @@ class Game:
     name = 'four_in_a_row'
     board_size = BOARD_SIZE
     board_shape = BOARD_SHAPE
-    input_shape = (7,) + BOARD_SHAPE
+    input_shape = (K * 2 + 1,) + BOARD_SHAPE
     pieces = PIECES
 
     def __init__(self):
@@ -93,7 +95,7 @@ class Game:
             return State(a.ravel(), state.player), b.ravel()
 
         identities = []
-        boards = state.boards.reshape((3,) + BOARD_SHAPE)
+        boards = state.boards.reshape((K,) + BOARD_SHAPE)
         apd = actions_prob_dist.reshape(BOARD_SHAPE)
         identities.append(make_identity(boards, apd))
         boards_m = np.flip(boards, 2)
@@ -150,7 +152,7 @@ class State:
         """ Make a turn """
         board = self.board.copy()
         board[action] = self.player
-        boards = np.append(board, self.boards[:BOARD_SIZE * 2])
+        boards = np.append(board, self.boards[:BOARD_SIZE * (K - 1)])
         state = State(boards, -self.player)
         return state
 
