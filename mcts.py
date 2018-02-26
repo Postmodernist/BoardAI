@@ -1,3 +1,4 @@
+import math
 import random
 
 import numpy as np
@@ -5,8 +6,8 @@ import numpy as np
 import config
 import log
 from game import Game, State
-from model import ResidualCnn
 from log_utils import print_actions_prob_dist
+from model import ResidualCnn
 
 
 class Node:
@@ -40,7 +41,7 @@ class Mcts:
     def __len__(self):
         return len(self.tree)
 
-    def choose_action(self, state: State, stochastic=True):
+    def get_action(self, state: State, stochastic=True):
         """ Search for the most promising action """
         # Set root node
         if state.id not in self.tree:
@@ -53,15 +54,12 @@ class Mcts:
             log.mcts.info('********** Simulation {} **********'.format(i + 1))
             log.mcts.info('')
             self._simulate()
-        # Get actions values and probability distribution
-        action_values, actions_prob_dist = self._get_action_values_and_prob_dist()
         # Choose the action
-        action = self._choose_action(actions_prob_dist, stochastic)
+        action, mcts_value, actions_prob_dist = self._choose_action(stochastic)
         # Make a move
         next_state = state.make_move(action)
-        # Write action stats to log
-        mcts_value = action_values[action]
         nn_value = -self.nn.predict(next_state)[0]
+        # Write action stats to log
         log.mcts.info('')
         log.mcts.info('----- MCTS search results -----')
         print_actions_prob_dist(log.mcts, actions_prob_dist)
@@ -116,30 +114,21 @@ class Mcts:
         log.mcts.info('Game is finished: {}'.format(node.state.finished))
         return node, root_to_leaf_edges
 
-    def _get_edge_with_max_qu(self, node: Node, total_visits: int):
+    @staticmethod
+    def _get_edge_with_max_qu(node: Node, total_visits: int):
         """ Return node edge with max Q + U score
             :param node             Node to examine
             :param total_visits     Total number of simulations made from the node
         """
-        # epsilon: noise ratio, [0...1]
-        # nu: noise values array of size len(node.edges)
-        if node == self.root:
-            epsilon = config.EPSILON
-            nu = np.random.dirichlet([config.ALPHA] * len(node.edges))  # exploration noise
-        else:
-            epsilon = 0
-            nu = [0] * len(node.edges)
         max_qu_sum = -99999
         chosen_edge = None
         # Choose best edge
-        for i, edge in enumerate(node.edges):
+        for edge in node.edges:
             q = edge.stats['Q']
-            p = (1 - epsilon) * edge.stats['P'] + epsilon * nu[i]  # P with noise
-            u = config.C * p * np.sqrt(np.log(total_visits) / (1 + edge.stats['N']))
+            u = config.C * edge.stats['P'] * (math.log(total_visits) / (1 + edge.stats['N'])) ** 0.5
             qu_sum = q + u  # probabilistic upper confidence tree score
-            log.mcts.info(
-                'Action {:2}: N {:2}, P {:.4f}, nu {:.4f}, P\' {:.4f}, W {:.4f}, Q {:.4f}, U {:.4f}, Q + U {:.4f}'
-                    .format(edge.action, edge.stats['N'], edge.stats['P'], nu[i], p, edge.stats['W'], q, u, qu_sum))
+            log.mcts.info('Action {:2}: N {:2}, P {:.4f}, W {:.4f}, Q {:.4f}, U {:.4f}, Q + U {:.4f}'
+                          .format(edge.action, edge.stats['N'], edge.stats['P'], edge.stats['W'], q, u, qu_sum))
             if qu_sum > max_qu_sum:
                 max_qu_sum = qu_sum
                 chosen_edge = edge
@@ -174,11 +163,11 @@ class Mcts:
             log.mcts.info('Updating edge with value {} for player {}: N = {}, W = {}, Q = {}'.format(
                 old_state_value, edge.player, edge.stats['N'], edge.stats['W'], edge.stats['Q']))
 
-    def _get_action_values_and_prob_dist(self):
-        """ Values and probabilities of root actions
-        :return action_values        1D array of size board_size
-        :return actions_prob_dist    1D array of size board_size
-        :rtype action_values: np.ndarray
+    def _choose_action(self, stochastic: bool):
+        """ Choose action
+        :param stochastic: choose stochastically or deterministically
+        :rtype action: int
+        :rtype action_value: float
         :rtype actions_prob_dist: np.ndarray
         """
         edges = self.root.edges
@@ -187,23 +176,16 @@ class Mcts:
         for edge in edges:
             visit_counts[edge.action] = edge.stats['N']
             action_values[edge.action] = edge.stats['Q']
-        # Normalize visit counts, so that probabilities add up to 1
-        actions_prob_dist = visit_counts / np.sum(visit_counts)
-        return action_values, actions_prob_dist
-
-    @staticmethod
-    def _choose_action(actions_prob_dist: np.ndarray, stochastic=True):
-        """ Choose action
-        :param actions_prob_dist    1D array of size board_size, Pi of actions
-        :param stochastic           if True then choose stochastically, otherwise -- deterministically
-        :rtype action               int
-        """
         if stochastic:
             # Choose stochastically using actions probability distribution
+            visit_counts = visit_counts ** (1 / config.TAU)  # exploration temperature
+            actions_prob_dist = visit_counts / sum(visit_counts)
             action_one_hot = np.random.multinomial(1, actions_prob_dist)
             action = np.where(action_one_hot)[0][0]  # index of a non-zero element
         else:
-            # Choose deterministically
-            actions = np.argwhere(actions_prob_dist == max(actions_prob_dist)).T[0]
+            # Choose deterministically by visit counts
+            actions_prob_dist = visit_counts / sum(visit_counts)
+            actions = np.argwhere(visit_counts == max(visit_counts)).T[0]
             action = random.choice(actions)  # tie break
-        return action
+        action_value = action_values[action]
+        return action, action_value, actions_prob_dist

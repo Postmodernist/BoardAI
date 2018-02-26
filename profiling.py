@@ -1,7 +1,6 @@
 import cProfile
 import sys
 
-import config
 import log
 from agents import Hel
 from main import load_model, batch_play
@@ -19,7 +18,7 @@ print('done')
 
 # Test run without profiling
 if False:
-    batch_play(EPISODES, best_player, best_player, config.TAU, memory, log.main)
+    batch_play(best_player, best_player, EPISODES, True, memory, log.main)
 
 # Run with profiling
-cProfile.run('batch_play(EPISODES, best_player, best_player, config.TAU, memory, log.main)', sort='tottime')
+cProfile.run('batch_play(best_player, best_player, EPISODES, True, memory, log.main)', sort='tottime')

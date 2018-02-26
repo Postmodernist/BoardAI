@@ -19,7 +19,7 @@ from memory import Memory
 from model import ResidualCnn
 from player import Player
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # suppress tf messages
 np.set_printoptions(suppress=True)
 
 
@@ -78,7 +78,7 @@ def train_model():
         best_player_version = retrain_model(current_player, best_player, best_player_version, memory)
         # Self play
         print('\nSelf play | Best player version: {}'.format(best_player_version))
-        batch_play(config.EPISODES, best_player, best_player, config.TAU, memory, log.main)
+        batch_play(best_player, best_player, config.EPISODES, True, memory, log.main)
         # Save memory
         if iteration % 5 == 0:
             memory.write('{}memory/memory{:04}.p'.format(paths.RUN, iteration))
@@ -86,7 +86,7 @@ def train_model():
 
 
 def load_model():
-    """ Load/create config, memory and model
+    """ Load/create memory and model
         :rtype current_nn: ResidualCnn
         :rtype best_nn: ResidualCnn
         :rtype best_player_version: int
@@ -96,14 +96,14 @@ def load_model():
     # Load config
     if initial.RUN_NUMBER is not None:
         run_archive_path = '{}{}/run{:04}/'.format(paths.RUN_ARCHIVE, Game.name, initial.RUN_NUMBER)
-        if pathlib.Path('{}config.py'.format(run_archive_path)).exists():
-            copyfile('{}config.py'.format(run_archive_path), './config.py')
-            reload(config)
     # Load memories
+    memory = Memory.create(config.MEMORY_SIZE)
     if initial.RUN_NUMBER is not None and initial.MEMORY_VERSION is not None:
-        memory = Memory.read('{}memory/memory{:04}.p'.format(run_archive_path, initial.MEMORY_VERSION))
-    else:
-        memory = Memory.create(config.MEMORY_SIZE)
+        memory_tmp = Memory.read('{}memory/memory{:04}.p'.format(run_archive_path, initial.MEMORY_VERSION))
+        if memory_tmp.size < memory.size:
+            memory.long_memory.extend(memory_tmp.long_memory)
+        else:
+            memory = memory_tmp
     print('Creating untrained neural networks... ', end='')
     sys.stdout.flush()
     current_nn = ResidualCnn.create()
@@ -126,85 +126,48 @@ def load_model():
     return current_nn, best_nn, best_player_version, memory
 
 
-def play_custom(episodes: int, run_number: int, player1_ver: int, player2_ver: int, tau: int, logger=log.null):
-    """ Play matches between specific versions of agents and/or human players
-    :param episodes         Number of games to play
-    :param run_number       Archived run ID to load model from
-    :param player1_ver      Version of model for Player1, -1 for human player
-    :param player2_ver      Version of model for Player2, -1 for human player
-    :param tau              Number of turns before switching to deterministic play
-    :param logger           Logger to write games progress and stats
-    :return batch_play() return value
+def retrain_model(current_player: Player, best_player: Player, best_player_version: int, memory: Memory):
+    """ Retrain model
+    :param current_player: agent being retrained
+    :param best_player: the best agent so far
+    :param best_player_version: version of the best agent
+    :param memory: Memory object
+    :return best_player_version: updated best agent version number
     """
-
-    def create_player(ver, name):
-        """ Create a human player or an agent """
-        if ver == -1:
-            # Create a human player
-            player = Human(name)
-        else:
-            # Create model for the player
-            agent_nn = ResidualCnn.create()
-            # Load model weights
-            if ver > 0:
-                path = '{}{}/run{:04}/models/version{:04}.h5'.format(paths.RUN_ARCHIVE, Game.name, run_number, ver)
-                model_tmp = ResidualCnn.read(path)
-                agent_nn.model.set_weights(model_tmp.get_weights())
-            player = Hel(name, agent_nn)
-        return player
-
-    player1 = create_player(player1_ver, 'Player1')
-    player2 = create_player(player2_ver, 'Player2')
-    return batch_play(episodes, player1, player2, tau, None, logger, verbose=False)
-
-
-def batch_play(episodes: int, player1: Player, player2: Player, tau: int, memory: Memory or None, logger=log.null,
-               verbose=True):
-    """ Play a batch of matches between player1 and player2
-    :param episodes     Number of games to play
-    :param player1      Player object
-    :param player2      Player object
-    :param tau          Turns before start playing deterministically
-    :param memory       Memory object
-    :param logger       Logger to write games progress and stats
-    :param verbose      Write progress info to console
-    :return wins        {player name: win count}
-    """
-    if verbose:
-        print('Playing a batch of {} episodes...'.format(episodes))
-    wins = {player1.name: 0, player2.name: 0, 'draw': 0}
-    env = Game()
-    for episode in range(episodes):
-        logger.info('')
-        logger.info('************ Episode {} of {} ************'.format(episode + 1, episodes))
-        if verbose:
-            progress_bar(episode + 1, episodes)
-        # Shuffle players
-        first = random.choice([1, -1])
-        players = {first: player1, -first: player2}
-        # Play a match
-        state = play(env, players[1], players[-1], tau, memory, logger)
-        # Update win counts
-        if state.value == -1:
-            winner = players[-state.player].name
-            wins[winner] += 1
-            logger.info('{} wins'.format(winner))
-        else:
-            wins['draw'] += 1
-            logger.info('Game draw')
-    return wins
+    current_nn = current_player.nn
+    best_nn = best_player.nn
+    log.model.info('Retraining model...')
+    print('\nRetraining model...')
+    sys.stdout.flush()
+    current_player.nn.retrain(memory.long_memory)
+    # Tournament
+    print('\nTournament')
+    sys.stdout.flush()
+    wins = batch_play(best_player, current_player, config.EVAL_EPISODES, False, None, log.tournament)
+    print('Wins: {}'.format(wins))
+    total_wins = wins[current_player.name] + wins[best_player.name]
+    current_player_wins_ratio = wins[current_player.name] / total_wins if total_wins != 0 else 0
+    if current_player_wins_ratio > config.WINS_RATIO:
+        best_player_version += 1
+        print('Setting up new best model... ', end='')
+        sys.stdout.flush()
+        best_nn.model.set_weights(current_nn.model.get_weights())
+        print('done')
+        best_nn.write('{}models/version{:04}.h5'.format(paths.RUN, best_player_version))
+    return best_player_version
 
 
-def play(env: Game, player1: Player, player2: Player, tau: int, memory: Memory or None, logger=log.null):
+def play(env: Game, player1: Player, player2: Player, exploratory: bool, memory: Memory or None, logger=log.null):
     """ Play a single match between player1 and player2
-    :param env      Game object
-    :param player1  Player object
-    :param player2  Player object
-    :param tau      Turns before start playing deterministically
-    :param memory   Memory object
-    :param logger   Logger to write games progress and stats
-    :return state   Final game state
+    :param env: Game object
+    :param player1: Player object
+    :param player2: Player object
+    :param exploratory: play matches in exploratory or competitive mode
+    :param memory: Memory object
+    :param logger: logger to write games progress and stats
+    :return state: final game state
     """
+    stochastic = exploratory
     # Reset game state
     state = env.reset()
     env.state.log(logger)
@@ -220,7 +183,6 @@ def play(env: Game, player1: Player, player2: Player, tau: int, memory: Memory o
         logger.info('')
         logger.info('Turn: {} ({})'.format(player.name, env.pieces[state.player]))
         # Get player's action
-        stochastic = turn < tau
         action, actions_prob_dist, mcts_value, nn_value = player.make_move(state, stochastic)
         # Update memory
         if memory is not None:
@@ -250,35 +212,81 @@ def play(env: Game, player1: Player, player2: Player, tau: int, memory: Memory o
     return state
 
 
-def retrain_model(current_player: Player, best_player: Player, best_player_version: int, memory: Memory):
-    """ Retrain model
-    :param current_player           Copy of the agent being retrained
-    :param best_player              The agent
-    :param best_player_version      Version of the agent
-    :param memory                   Memory object
-    :return best_player_version     Updated version of the agent
+def batch_play(player1: Player, player2: Player, episodes: int, exploratory: bool, memory: Memory or None,
+               logger=log.null, verbose=True):
+    """ Play a batch of matches between player1 and player2
+    :param player1: Player object
+    :param player2: Player object
+    :param episodes: number of games to play
+    :param exploratory: play matches in exploratory or competitive mode
+    :param memory: Memory object
+    :param logger: logger to write games progress and stats
+    :param verbose: write progress info to console
+    :return wins: {player name: win count}
     """
-    current_nn = current_player.nn
-    best_nn = best_player.nn
-    log.model.info('Retraining model...')
-    print('\nRetraining model...')
-    sys.stdout.flush()
-    current_player.nn.retrain(memory.long_memory)
-    # Tournament
-    print('\nTournament')
-    sys.stdout.flush()
-    wins = batch_play(config.EVAL_EPISODES, best_player, current_player, 0, None, log.tournament)
-    print('Wins: {}'.format(wins))
-    total_wins = wins[current_player.name] + wins[best_player.name]
-    current_player_wins_ratio = wins[current_player.name] / total_wins if total_wins != 0 else 0
-    if current_player_wins_ratio > config.WINS_RATIO:
-        best_player_version += 1
-        print('Setting up new best model... ', end='')
-        sys.stdout.flush()
-        best_nn.model.set_weights(current_nn.model.get_weights())
-        print('done')
-        best_nn.write('{}models/version{:04}.h5'.format(paths.RUN, best_player_version))
-    return best_player_version
+    if verbose:
+        print('Playing a batch of {} episodes...'.format(episodes))
+    wins = {player1.name: 0, player2.name: 0, 'draw': 0}
+    env = Game()
+    for episode in range(episodes):
+        logger.info('')
+        logger.info('************ Episode {} of {} ************'.format(episode + 1, episodes))
+        if verbose:
+            progress_bar(episode + 1, episodes)
+        # Shuffle players
+        first = random.choice([1, -1])
+        players = {first: player1, -first: player2}
+        # Play a match
+        state = play(env, players[1], players[-1], exploratory, memory, logger)
+        # Update win counts
+        if state.value == -1:
+            winner = players[-state.player].name
+            wins[winner] += 1
+            logger.info('{} wins'.format(winner))
+        else:
+            wins['draw'] += 1
+            logger.info('Game draw')
+    return wins
+
+
+def play_custom(p1_name: str, p1_type: str, p1_run: int, p1_model_ver: int, p2_name: str, p2_type: str, p2_run: int,
+                p2_model_ver: int, episodes: int, exploratory: bool, logger=log.null, verbose=True):
+    """ Play matches between specific versions of agents and/or human players
+    :param episodes: number of games to play
+    :param p1_name: player1 name
+    :param p1_type: human or hel
+    :param p1_run: archived run number to load model from (hel only)
+    :param p1_model_ver: version of model to load (hel only)
+    :param p2_name: player2 name
+    :param p2_type: human or hel
+    :param p2_run: archived run number to load model from (hel only)
+    :param p2_model_ver: version of model to load (hel only)
+    :param exploratory: play matches in exploratory or competitive mode
+    :param logger: logger to write games progress and stats
+    :param verbose: write progress info to console
+    :return batch_play() return value
+    """
+
+    def create_player(name: str, p_type: str, run: int, ver: int):
+        """ Create a human player or an agent """
+        if p_type == 'human':
+            # Create a human player
+            player = Human(name)
+        elif p_type == 'hel':
+            # Create model for the player
+            agent_nn = ResidualCnn.create()
+            # Load model weights
+            path = '{}{}/run{:04}/models/version{:04}.h5'.format(paths.RUN_ARCHIVE, Game.name, run, ver)
+            model_tmp = ResidualCnn.read(path)
+            agent_nn.model.set_weights(model_tmp.get_weights())
+            player = Hel(name, agent_nn)
+        else:
+            player = None
+        return player
+
+    player1 = create_player(p1_name, p1_type, p1_run, p1_model_ver)
+    player2 = create_player(p2_name, p2_type, p2_run, p2_model_ver)
+    return batch_play(player1, player2, episodes, exploratory, None, logger, verbose)
 
 
 def test_predictions(run_number, model_ver):
@@ -307,14 +315,10 @@ def test_predictions(run_number, model_ver):
 
 
 def test_play():
-    """ Play custom set of games with chosen opponents """
     wins = play_custom(
-        episodes=1,  # number of games
-        run_number=0,
-        player1_ver=-1,  # -1 for human player
-        player2_ver=-1,  # -1 for human player
-        tau=0,
-        logger=log.console)
+        p1_name='Player1', p1_type='human', p1_run=0, p1_model_ver=0,
+        p2_name='Player2', p2_type='human', p2_run=0, p2_model_ver=0,
+        episodes=1, exploratory=False, logger=log.console, verbose=False)
     print('Wins: {}'.format(wins))
 
 

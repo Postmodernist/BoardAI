@@ -16,7 +16,7 @@ class Hel(Player):
         """ Run MCTS to choose action """
         if self.mcts is None:
             self.mcts = Mcts(self.nn, state)
-        return self.mcts.choose_action(state, stochastic)
+        return self.mcts.get_action(state, stochastic)
 
 
 class Human(Player):
