@@ -1,4 +1,3 @@
-import math
 import random
 
 import numpy as np
@@ -37,12 +36,14 @@ class Mcts:
         self.root = Node(state)
         self.tree = {}
         self._add_node(self.root)
+        self.stochastic = None
 
     def __len__(self):
         return len(self.tree)
 
     def get_action(self, state: State, stochastic=True):
         """ Search for the most promising action """
+        self.stochastic = stochastic
         # Set root node
         if state.id not in self.tree:
             self._reset_tree(state)
@@ -55,7 +56,7 @@ class Mcts:
             log.mcts.info('')
             self._simulate()
         # Choose the action
-        action, mcts_value, actions_prob_dist = self._choose_action(stochastic)
+        action, mcts_value, actions_prob_dist = self._choose_action()
         # Make a move
         next_state = state.make_move(action)
         nn_value = -self.nn.predict(next_state)[0]
@@ -108,21 +109,26 @@ class Mcts:
         log.mcts.info('Game is finished: {}'.format(node.state.finished))
         return node, root_to_leaf_edges
 
-    @staticmethod
-    def _get_edge_with_max_qu(node: Node):
+    def _get_edge_with_max_qu(self, node: Node):
         """ Return node edge with max Q + U score """
         total_visits = sum(edge.stats['N'] for edge in node.edges)
         max_qu_sum = -99999
         chosen_edge = None
+        # Probability noise
+        if self.stochastic and node == self.root:
+            nu = np.random.dirichlet([config.ALPHA] * len(node.edges))
+            epsilon = config.EPSILON
+        else:
+            nu = [0] * len(node.edges)
+            epsilon = 0
         # Choose best edge
-        for edge in node.edges:
-            if edge.stats['N'] == 0:
-                return edge
+        for i, edge in enumerate(node.edges):
             q = edge.stats['Q']
-            u = config.C * edge.stats['P'] * (math.log(total_visits) / (1 + edge.stats['N'])) ** 0.5
+            p = (1 - epsilon) * edge.stats['P'] + epsilon * nu[i]
+            u = config.C * p * total_visits ** 0.5 / (1 + edge.stats['N'])
             qu_sum = q + u  # probabilistic upper confidence tree score
             log.mcts.info('Action {:2}: N {:2}, P {:.4f}, W {:.4f}, Q {:.4f}, U {:.4f}, Q + U {:.4f}'
-                          .format(edge.action, edge.stats['N'], edge.stats['P'], edge.stats['W'], q, u, qu_sum))
+                          .format(edge.action, edge.stats['N'], p, edge.stats['W'], q, u, qu_sum))
             if qu_sum > max_qu_sum:
                 max_qu_sum = qu_sum
                 chosen_edge = edge
@@ -157,9 +163,8 @@ class Mcts:
             log.mcts.info('Updating edge with value {} for player {}: N = {}, W = {}, Q = {}'.format(
                 old_state_value, edge.player, edge.stats['N'], edge.stats['W'], edge.stats['Q']))
 
-    def _choose_action(self, stochastic: bool):
+    def _choose_action(self):
         """ Choose action
-        :param stochastic: choose stochastically or deterministically
         :rtype action: int
         :rtype action_value: float
         :rtype actions_prob_dist: np.ndarray
@@ -170,7 +175,7 @@ class Mcts:
         for edge in edges:
             visit_counts[edge.action] = edge.stats['N']
             action_values[edge.action] = edge.stats['Q']
-        if stochastic:
+        if self.stochastic:
             # Choose stochastically using actions probability distribution
             visit_counts = visit_counts ** (1 / config.TAU)  # exploration temperature
             actions_prob_dist = visit_counts / sum(visit_counts)
