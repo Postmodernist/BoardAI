@@ -324,5 +324,4 @@ def test_play():
 
 if __name__ == '__main__':
     train_model()
-    # test_predictions(0, 1)
     # test_play()

@@ -35,7 +35,7 @@ class Mcts:
         self.nn = nn
         self.root = Node(state)
         self.tree = {}
-        self._add_node(self.root)
+        self._add_node(self.tree, self.root)
         self.stochastic = None
 
     def __len__(self):
@@ -49,6 +49,7 @@ class Mcts:
             self._reset_tree(state)
         else:
             self.root = self.tree[state.id]
+            self._prune_tree(self.root)
         # Run the simulations
         for i in range(config.MCTS_SIMULATIONS):
             log.mcts.info('')
@@ -68,19 +69,34 @@ class Mcts:
         log.mcts.info('')
         return action, actions_prob_dist, mcts_value, nn_value
 
+    @staticmethod
+    def _add_node(tree: dict, node: Node):
+        """ Add node to the MCTS tree """
+        tree[node.state.id] = node
+
     def _reset_tree(self, state: State):
         """ Reset MCTS tree """
         self.root = Node(state)
         self.tree = {}
-        self._add_node(self.root)
+        self._add_node(self.tree, self.root)
 
-    def _add_node(self, node: Node):
-        """ Add node to the MCTS tree """
-        self.tree[node.state.id] = node
+    def _prune_tree(self, node: Node):
+        """ Keep only subtree of the node and prune the rest """
+
+        def copy_subtree(node_: Node):
+            for edge in node_.edges:
+                self._add_node(subtree, edge.out_node)
+                copy_subtree(edge.out_node)
+
+        subtree = {}
+        self._add_node(subtree, node)
+        copy_subtree(node)
+        self.tree = subtree
 
     def _simulate(self):
         """ Move to leaf node, evaluate it, and back propagate the value """
         log.mcts.info('Root node: {}'.format(self.root.state.id))
+        self.root.state.log(log.mcts)
         log.mcts.info('Current player: {}'.format(self.root.state.player))
         log.mcts.info('Moving to leaf...')
         leaf, root_to_leaf_edges = self._move_to_leaf()
@@ -106,6 +122,7 @@ class Mcts:
             log.mcts.info('Chosen action: {}'.format(chosen_edge.action))
             node = chosen_edge.out_node
             root_to_leaf_edges.append(chosen_edge)
+        node.state.log(log.mcts)
         log.mcts.info('Game is finished: {}'.format(node.state.finished))
         return node, root_to_leaf_edges
 
@@ -141,11 +158,13 @@ class Mcts:
             # Add node if necessary
             if new_state.id not in self.tree:
                 new_node = Node(new_state)
-                self._add_node(new_node)
+                self._add_node(self.tree, new_node)
                 log.mcts.info('New node {}, P = {:.6f}'.format(new_node.state.id, actions_prob_dist[action]))
+                new_node.state.log(log.mcts)
             else:
                 new_node = self.tree[new_state.id]
                 log.mcts.info('Old node {}'.format(new_node.state.id))
+                new_node.state.log(log.mcts)
             # Add edge
             new_edge = Edge(leaf, new_node, action, actions_prob_dist[action])
             leaf.edges.append(new_edge)

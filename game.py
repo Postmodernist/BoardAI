@@ -1,9 +1,9 @@
 import numpy as np
 
-K = 2  # Number of boards to keep, must be > 1
+K = 2  # Number of boards to keep
 
 # Board
-BOARD_SIDE = 7
+BOARD_SIDE = 5
 BOARD_SIZE = BOARD_SIDE ** 2
 BOARD_SHAPE = (BOARD_SIDE, BOARD_SIDE)
 ZERO_BOARDS = np.zeros(BOARD_SIZE * K, dtype=np.int)  # K boards
@@ -117,7 +117,7 @@ class State:
 
     def __init__(self, boards: np.ndarray, player: int):
         """
-        :param boards: a stack of last 3 boards
+        :param boards: a stack of last K boards
         :param player: player to make turn
         """
         self.boards = boards
