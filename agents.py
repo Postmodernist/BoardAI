@@ -1,5 +1,6 @@
 from game import State
 from mcts import Mcts
+from mcts_classic import MctsClassic
 from model import ResidualCnn
 from player import Player
 
@@ -17,6 +18,20 @@ class Hel(Player):
         if self.mcts is None:
             self.mcts = Mcts(self.nn, state)
         return self.mcts.get_action(state, stochastic)
+
+
+class Bot(Player):
+    """ AI agent """
+
+    def __init__(self, name: str):
+        super().__init__(name)
+        self.mcts = None
+
+    def make_move(self, state: State, _):
+        """ Run MCTS to choose action """
+        if self.mcts is None:
+            self.mcts = MctsClassic(state)
+        return self.mcts.get_action(state)
 
 
 class Human(Player):

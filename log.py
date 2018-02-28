@@ -9,7 +9,7 @@ pathlib.Path('{}logs'.format(paths.RUN)).mkdir(parents=True, exist_ok=True)
 # Set all LOG_DISABLED to True to disable logging
 # WARNING: the mcts log file gets big quite quickly
 LOG_DISABLED = {
-    'main': True, 'mcts': True, 'memory': True, 'model': True, 'tournament': False
+    'main': False, 'mcts': True, 'memory': True, 'model': True, 'tournament': False
 }
 
 main = create_logger('main', paths.RUN + 'logs/main.log')

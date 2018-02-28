@@ -142,7 +142,7 @@ class Mcts:
         for i, edge in enumerate(node.edges):
             q = edge.stats['Q']
             p = (1 - epsilon) * edge.stats['P'] + epsilon * nu[i]
-            u = config.C * p * total_visits ** 0.5 / (1 + edge.stats['N'])
+            u = config.MCTS_C * p * total_visits ** 0.5 / (1 + edge.stats['N'])
             qu_sum = q + u  # probabilistic upper confidence tree score
             log.mcts.info('Action {:2}: N {:2}, P {:.4f}, W {:.4f}, Q {:.4f}, U {:.4f}, Q + U {:.4f}'
                           .format(edge.action, edge.stats['N'], p, edge.stats['W'], q, u, qu_sum))

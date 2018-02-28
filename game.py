@@ -156,6 +156,19 @@ class State:
         state = State(boards, -self.player)
         return state
 
+    @staticmethod
+    def is_player_won(board: np.ndarray, player: int):
+        """ Return True if opponent made a winning move """
+        for w in WIN_POSITIONS:
+            failed = False
+            for i in w:
+                if board[i] != player:
+                    failed = True
+                    break
+            if not failed:
+                return True
+        return False
+
     def _get_allowed_actions(self):
         """ Get all actions that can be taken in current state """
 

@@ -12,7 +12,7 @@ import config
 import initial
 import log
 import paths
-from agents import Hel, Human
+from agents import Hel, Bot, Human
 from game import Game
 from log_utils import print_actions_prob_dist, progress_bar
 from memory import Memory
@@ -54,7 +54,7 @@ def train_model():
         progress_bar(len(memory), memory.size)
         env = Game()
         while len(memory) < memory.size:
-            play(env, best_player, best_player, config.TAU, memory)
+            play(env, best_player, best_player, exploratory=True, memory=memory)
             progress_bar(len(memory), memory.size)
         # Save memory
         memory.write('{}memory/memory{:04}.p'.format(paths.RUN, 0))
@@ -147,7 +147,7 @@ def retrain_model(current_player: Player, best_player: Player, best_player_versi
     print('Wins: {}'.format(wins))
     total_wins = wins[current_player.name] + wins[best_player.name]
     current_player_wins_ratio = wins[current_player.name] / total_wins if total_wins != 0 else 0
-    if current_player_wins_ratio > config.WINS_RATIO:
+    if current_player_wins_ratio > config.EVAL_WINS_RATIO:
         best_player_version += 1
         print('Setting up new best model... ', end='')
         sys.stdout.flush()
@@ -155,6 +155,29 @@ def retrain_model(current_player: Player, best_player: Player, best_player_versi
         print('done')
         best_nn.write('{}models/version{:04}.h5'.format(paths.RUN, best_player_version))
     return best_player_version
+
+
+def collect_mcts_classic_memories():
+    """ Run MCTS classic to collect memories """
+    pathlib.Path('{}memory'.format(paths.RUN)).mkdir(parents=True, exist_ok=True)
+    env = Game()
+    player = Bot('Justin')
+    memory = Memory.create(config.MEMORY_SIZE)
+    print('Collecting memories... ')
+    progress_bar(len(memory), memory.size)
+    episode = 0
+    while len(memory) < memory.size:
+        episode += 1
+        log.main.info('')
+        log.main.info('************ Episode {} ************'.format(episode))
+        state = play(env, player, player, exploratory=False, memory=memory, logger=log.main)
+        if state.value == -1:
+            log.main.info('{} wins'.format(Game.pieces[-state.player]))
+        else:
+            log.main.info('Game draw')
+        progress_bar(len(memory), memory.size)
+    # Save memory
+    memory.write('{}memory/memory{:04}.p'.format(paths.RUN, 0))
 
 
 def play(env: Game, player1: Player, player2: Player, exploratory: bool, memory: Memory or None, logger=log.null):
@@ -323,5 +346,6 @@ def test_play():
 
 
 if __name__ == '__main__':
-    train_model()
+    # train_model()
+    collect_mcts_classic_memories()
     # test_play()

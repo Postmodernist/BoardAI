@@ -49,8 +49,9 @@ class ResidualCnn:
 
     def retrain(self, memory: deque):
         """ Retrain model """
-        for i in range(config.TRAINING_LOOPS):
-            mini_batch = random.sample(memory, min(config.BATCH_SIZE, len(memory)))
+        mem = list(memory)
+        for i in range(config.MEMORY_SIZE // config.BATCH_SIZE):
+            mini_batch = mem[i * config.BATCH_SIZE:(i + 1) * config.BATCH_SIZE]
             training_states = np.array([self._state_to_model_input(item['state']) for item in mini_batch])
             training_targets = {
                 'value_head': np.array([item['value'] for item in mini_batch]),
