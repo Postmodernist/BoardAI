@@ -6,8 +6,8 @@ from .state import State
 
 class Game(IGame):
     """
-    'Four' game. First player to get 4 marks in a straight line wins. Mark can be placed only on the
-    border or in a cell that has a non-empty neighbor.
+    'Four' game.The first player to have 4 pieces in a straight line wins.
+    A player can't place a piece on a square surrounded by empty squares.
     """
 
     BOARD_SHAPE = BOARD_SHAPE

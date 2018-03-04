@@ -12,7 +12,7 @@ class State(IGameState):
         self._turn = turn
         self._valid_actions = get_valid_actions(board)
         self._opponent_won = is_player_won(board, -player)
-        self._finished = not any(self._valid_actions) or self._opponent_won
+        self._finished = len(self._valid_actions) == 0 or self._opponent_won
         self._value = -1 if self._opponent_won else 0
 
     def get_board(self) -> np.ndarray:
