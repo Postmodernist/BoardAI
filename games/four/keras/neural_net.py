@@ -15,7 +15,7 @@ from .model_builder import build_model
 class NeuralNet(INeuralNet):
 
     def __init__(self):
-        if True:  # choose model
+        if False:  # choose model
             self.model = build_model(Game.BOARD_SHAPE, Game.ACTION_SIZE)
         else:
             self.model = build_model2(Game.BOARD_SHAPE, Game.ACTION_SIZE)
@@ -56,6 +56,8 @@ class NeuralNet(INeuralNet):
         valid_actions_mask = np.zeros(Game.ACTION_SIZE, dtype=np.int)
         valid_actions_mask[valid_actions] = 1
         pi *= valid_actions_mask  # mask invalid actions
+        if np.nonzero(pi)[0].size == 0:
+            pi += valid_actions_mask  # zero or masked predictions, working around
         pi /= sum(pi)  # normalize
         return pi, v[0][0]
 
