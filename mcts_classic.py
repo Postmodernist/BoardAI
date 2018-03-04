@@ -3,28 +3,10 @@ import random
 
 import numpy as np
 
-from config import N, CLASSIC_MCTS_SIMULATIONS as SIMULATIONS, CLASSIC_C_PUCT as C_PUCT
+from config import CLASSIC_MCTS_SIMULATIONS as SIMULATIONS, CLASSIC_C_PUCT as C_PUCT
 from intefraces.i_game_state import IGameState
 from utils.loaders import Game
 from utils.progress import progress_bar
-
-
-def get_neighbors():
-    """ Get neighbors for each position """
-    index_board = np.arange(Game.BOARD_SIZE, dtype=np.int)
-    # Frame index board with -1 values
-    fb_n = N + 2
-    frame_board = np.full(fb_n ** 2, -1)
-    frame_board.reshape(fb_n, fb_n)[1:-1, 1:-1] = index_board.reshape(N, N)
-    # Get neighbors
-    neighbors = {}
-    for i in np.arange(fb_n ** 2).reshape(fb_n, fb_n)[1:-1, 1:-1].ravel():
-        ni = [i - fb_n - 1, i - fb_n, i - fb_n + 1, i - 1, i + 1, i + fb_n - 1, i + fb_n, i + fb_n + 1]
-        neighbors[frame_board[i]] = list(filter(lambda x: x != -1, frame_board[ni]))
-    return neighbors
-
-
-NEIGHBORS = get_neighbors()
 
 
 class Node:
@@ -68,7 +50,7 @@ class MctsClassic:
             self._simulate()
             if verbose:
                 progress_bar(i + 1, SIMULATIONS, 'Exploring tree')
-        # Return visit counts
+        # Return pi
         visit_counts = np.zeros(Game.ACTION_SIZE, dtype=np.integer)
         for edge in self._root.edges:
             visit_counts[edge.action] = edge.stats['N']
