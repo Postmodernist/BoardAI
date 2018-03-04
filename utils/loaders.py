@@ -35,14 +35,14 @@ def load_model() -> (INeuralNet, INeuralNet, int):
     :returns
         best_nn: best NeuralNet object
         adversary_nn: adversary NeuralNet object
-        best_model_version: current version of the best NeuralNet
+        model_version: current version of the best NeuralNet
     """
     best_nn = NeuralNet.create()
     if LOAD_DIR_NUMBER is None or MODEL_VERSION is None:
-        best_model_version = 0
+        model_version = 0
     else:
-        best_model_version = MODEL_VERSION
+        model_version = MODEL_VERSION
         best_nn.load(MODEL_FOLDER, MODEL_NAME)
     adversary_nn = NeuralNet.create()
     adversary_nn.model.set_weights(best_nn.model.get_weights())
-    return best_nn, adversary_nn, best_model_version
+    return best_nn, adversary_nn, model_version

@@ -22,7 +22,7 @@ class SelfPlay:
         turn = 0
         while not state.is_game_finished():
             turn += 1
-            self._logger.info('Turn {}'.format(turn))
+            self._logger.info('---------- Turn {}'.format(turn))
             # Get action
             action, pi = self._player.get_action(state)
             # Commit example
@@ -50,7 +50,7 @@ class SelfPlay:
         t_start = time.time()
         t = time.time()
         for e in range(episodes):
-            self._logger.info('************ Episode {} of {} ************'.format(e, episodes))
+            self._logger.info('************ Episode {} of {} ************'.format(e + 1, episodes))
             # Play a match
             self.single(memory)
             # Output progress
@@ -60,4 +60,4 @@ class SelfPlay:
                 eta = t_start + episode_time.avg * episodes - t
                 suffix = 'Episode time: {:.3f}s | Total: {} | ETA: {}'.format(
                     episode_time.avg, sec_to_time(round(episode_time.sum)), sec_to_time(round(eta)))
-                progress_bar(e, episodes, prefix, suffix)
+                progress_bar(e + 1, episodes, prefix, suffix)

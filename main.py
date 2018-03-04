@@ -17,7 +17,10 @@ from utils.loggers import console as console_log
 from utils.paths import TEMP_DIR
 
 # Run mode -- 0: learn, 1: custom play
-RUN_MODE = int(sys.argv[1])
+if len(sys.argv) > 1:
+    RUN_MODE = int(sys.argv[1])
+else:
+    RUN_MODE = 0
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # suppress tf messages
 
@@ -36,7 +39,7 @@ def learn():
 
     # Initialize memory and model
     memory = load_memory()
-    best_nn, adversary_nn, best_model_version = load_model()
+    best_nn, adversary_nn, model_version = load_model()
 
     print('Plotting model... ', end='')
     stdout.flush()
@@ -68,7 +71,7 @@ def learn():
         # Evaluate
         best_agent.set_simulations(config.MCTS_COMPETITIVE_SIMULATIONS)
         best_agent.set_pi_turns(0)
-        wins = evaluate.batch(config.EVAL_EPISODES, 'Evaluate (best ver {})'.format(best_model_version))
+        wins = evaluate.batch(config.EVAL_EPISODES, 'Evaluate (model {})'.format(model_version))
         best_wins = wins[best_agent.get_name()]
         adversary_wins = wins[adversary_agent.get_name()]
         total_wins = best_wins + adversary_wins
@@ -78,8 +81,8 @@ def learn():
         else:
             print('New model ACCEPTED')
             best_nn.model.set_weights(adversary_nn.model.get_weights())
-            best_model_version += 1
-            best_nn.save(TEMP_DIR, 'model{:04}.h5'.format(best_model_version))
+            model_version += 1
+            best_nn.save(TEMP_DIR, 'model{:04}.h5'.format(model_version))
         # Self-play
         iteration += 1
         best_agent.set_simulations(config.MCTS_TRAIN_SIMULATIONS)

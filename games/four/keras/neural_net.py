@@ -20,8 +20,8 @@ class NeuralNet(INeuralNet):
         else:
             self.model = build_model2(Game.BOARD_SHAPE, Game.ACTION_SIZE)
         self._loss = []
-        self._value_loss = []
         self._policy_loss = []
+        self._value_loss = []
 
     @staticmethod
     def create() -> INeuralNet:
@@ -40,9 +40,9 @@ class NeuralNet(INeuralNet):
         target_pis = np.asarray(target_pis)
         target_vs = np.asarray(target_vs)
         fit = self.model.fit(x=input_boards, y=[target_pis, target_vs], batch_size=BATCH_SIZE, epochs=EPOCHS)
-        self._loss.append(round(fit.history['loss'][EPOCHS - 1], 4))
-        self._value_loss.append(round(fit.history['v'][EPOCHS - 1], 4))
-        self._policy_loss.append(round(fit.history['pi'][EPOCHS - 1], 4))
+        self._loss.extend(fit.history['loss'])
+        self._policy_loss.extend(fit.history['pi_loss'])
+        self._value_loss.extend(fit.history['v_loss'])
         self._plot_train_losses()
 
     def predict(self, canonical_board: np.ndarray, valid_actions: list):
@@ -60,7 +60,7 @@ class NeuralNet(INeuralNet):
         return pi, v[0][0]
 
     def save(self, folder: str, name: str):
-        print('Saving model weights to {} ... '.format(name), end='')
+        print('Saving model weights to {}... '.format(name), end='')
         stdout.flush()
         Path(folder).mkdir(parents=True, exist_ok=True)
         path = Path(folder, name)
@@ -68,7 +68,7 @@ class NeuralNet(INeuralNet):
         print('done')
 
     def load(self, folder: str, name: str):
-        print('Loading model weights from {} ... '.format(name), end='')
+        print('Loading model weights from {}... '.format(name), end='')
         stdout.flush()
         path = Path(folder, name)
         if not path.exists():
@@ -82,7 +82,7 @@ class NeuralNet(INeuralNet):
         Path(PLOT_LOSSES_FOLDER).mkdir(parents=True, exist_ok=True)
         path = Path(PLOT_LOSSES_FOLDER, PLOT_LOSSES_NAME)
         plt.plot(self._loss, 'k', linewidth=1.0)
-        plt.plot(self._value_loss, 'g', linewidth=1.0)
         plt.plot(self._policy_loss, 'b', linewidth=1.0)
-        plt.legend(['Overall loss', 'Value loss', 'Policy loss'], loc='lower left')
+        plt.plot(self._value_loss, 'g', linewidth=1.0)
+        plt.legend(['Overall loss', 'Policy loss', 'Value loss'], loc='lower left')
         plt.savefig(str(path))

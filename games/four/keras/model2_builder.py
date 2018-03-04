@@ -17,7 +17,7 @@ def build_model2(board_shape: tuple, action_size: int):
     pi = policy_head(x, action_size)
     v = value_head(x)
     model = Model(inputs=input_boards, outputs=[pi, v])
-    model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
+    model.compile(loss={'pi': 'categorical_crossentropy', 'v': 'mean_squared_error'},
                   optimizer=SGD(LEARNING_RATE, MOMENTUM))
     return model
 

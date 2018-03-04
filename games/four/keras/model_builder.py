@@ -30,7 +30,8 @@ def build_model(board_shape: tuple, action_size: int):
     # BATCH_SIZE x 1
     v = Dense(1, activation='tanh', name='v')(s_fc2)
     model = Model(inputs=input_boards, outputs=[pi, v])
-    model.compile(loss=['categorical_crossentropy', 'mean_squared_error'], optimizer=Adam(LEARNING_RATE))
+    model.compile(loss={'pi': 'categorical_crossentropy', 'v': 'mean_squared_error'},
+                  optimizer=Adam(LEARNING_RATE))
     return model
 
 

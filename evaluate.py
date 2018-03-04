@@ -5,7 +5,7 @@ from intefraces.i_player import IPlayer
 from utils.average_meter import AverageMeter
 from utils.loaders import Game
 from utils.loggers import evaluation as eval_log
-from utils.progress import progress_bar
+from utils.progress import progress_bar, sec_to_time
 
 
 class Evaluate:
@@ -65,8 +65,9 @@ class Evaluate:
                 if self._verbose:
                     episode_time.update(time.time() - t)
                     t = time.time()
-                    suffix = 'Episode time: {:.3f}s | Total: {:1.1f}s | ETA: {:1.1f}s'.format(
-                        episode_time.avg, episode_time.sum, t_start + episode_time.avg * episodes - t)
+                    eta = t_start + episode_time.avg * episodes - t
+                    suffix = 'Episode time: {:.3f}s | Total: {} | ETA: {}'.format(
+                        episode_time.avg, sec_to_time(round(episode_time.sum)), sec_to_time(round(eta)))
                     progress_bar(e, episodes, prefix, suffix)
 
         wins = {self._player1.get_name(): 0, self._player2.get_name(): 0, 'draw': 0}
