@@ -1,6 +1,8 @@
 import logging
+from pathlib import Path
 
-from game import Game
+from config import LOG_DISABLED
+from utils.paths import LOG_DIR
 
 
 class ConsoleLog:
@@ -31,33 +33,26 @@ class NullLog:
         pass
 
 
-def create_logger(name, log_file, level=logging.INFO):
+def create_logger(name, path, disabled):
     formatter = logging.Formatter(
         fmt='%(asctime)s %(levelname)s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S')
-    handler = logging.FileHandler(log_file)
+    handler = logging.FileHandler(path)
     handler.setFormatter(formatter)
     logger = logging.getLogger(name)
-    logger.setLevel(level)
+    logger.setLevel(logging.INFO)
     if not logger.handlers:
         logger.addHandler(handler)
+    logger.disabled = disabled
     return logger
 
 
-def print_actions_prob_dist(logger, actions_prob_dist):
-    """ Log actions probability distribution """
-    if logger.disabled:
-        return
-    n_rows = Game.board_shape[0]
-    row_len = Game.board_shape[1]
-    for row in range(n_rows):
-        logger.info(' '.join(['----' if prob == 0 else '{:.2f}'.format(prob)
-                              for prob in actions_prob_dist[row_len * row: row_len * (row + 1)]]))
+# Create log directory
+Path(LOG_DIR).mkdir(parents=True, exist_ok=True)
 
-
-def progress_bar(current: int, total: int, bar_size=50):
-    full_len = int(current * bar_size / total + 0.5)
-    empty_len = bar_size - full_len
-    print('\r[{}{}] {}/{}'.format('#' * full_len, '.' * empty_len, current, total), end='')
-    if current == total:
-        print()
+# Create loggers
+training = create_logger('train', str(Path(LOG_DIR, 'train.log')), LOG_DISABLED['train'])
+evaluation = create_logger('eval', str(Path(LOG_DIR, 'eval.log')), LOG_DISABLED['eval'])
+mcts = create_logger('mcts', str(Path(LOG_DIR, 'mcts.log')), LOG_DISABLED['mcts'])
+console = ConsoleLog()
+null = NullLog()

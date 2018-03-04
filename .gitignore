@@ -1,9 +1,9 @@
-__pycache__/
-venv/
-run/
-run_archive/
+__pycache__
+venv
+temp
+archive
+old
 .idea
 *.log
 *.py[cod]
 *$py.class
-

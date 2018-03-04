@@ -1,33 +1,45 @@
-# Self play
-EPISODES = 50  # number of self-play games (AZ: 25000)
-TAU = 1  # temperature, parameter controlling exploration
-ALPHA = 0.8  # dirichlet distribution parameter
-EPSILON = 0.2  # probability noise ratio
+# Game
+GAME = 'four'
+N = 6  # length of the board side
 
-# Evaluation
-EVAL_EPISODES = 20  # number of tournament games (AZ: 400)
-EVAL_WINS_RATIO = 0.55  # current player must win this percent of games to be declared the new best (AZ: 0.55)
+# Memory and model loading parameters
+LOAD_DIR_NUMBER = None
+MEMORY_VERSION = None
+MODEL_VERSION = None
 
-# MCTS
-MCTS_SIMULATIONS = 100  # number of MCTS simulations per turn (AZ: 1600)
-MCTS_C = 1  # coefficient of U
+# Neural Net
+MODEL = 'keras'
+EPOCHS = 10
+BATCH_SIZE = 64
+CUDA = True
+# 'keras' model
+KERAS_LEARNING_RATE = 0.001
+KERAS_DROPOUT = 0.3
+KERAS_FILTERS = 512
+KERAS_KERNEL_SIZE = 3
+# 'keras2' model
+KERAS2_LEARNING_RATE = 0.01
+KERAS2_MOMENTUM = 0.9
+KERAS2_REG_CONST = 0.0001
+KERAS2_RESIDUAL_LAYERS = 6
+KERAS2_FILTERS = 75
+KERAS2_KERNEL_SIZE = 4
 
-# MCTS Classic
-MCTS_CLASSIC_SIMULATIONS = 1000
-MCTS_CLASSIC_VERBOSE = False
+# Training
+SELF_PLAY_EPISODES = 100
+STOCHASTIC_TURNS = 15
+MCTS_TRAIN_SIMULATIONS = 50
+MCTS_COMPETITIVE_SIMULATIONS = 100
+C_PUCT = 1.0
+ALPHA = 0.8  # dirichlet noise parameter
+EPSILON = 0.2  # noise fraction
+EVAL_EPISODES = 40
+EVAL_THRESHOLD = 0.6
+MEMORY_SIZE = 200000
 
-# Model retraining
-MEMORY_SIZE = 102400  # number of evaluated positions from last games (AZ: ~100,000,000)
-BATCH_SIZE = 512  # mini-batch size (AZ: 2048)
-TRAINING_LOOPS = 20
-EPOCHS = 1
-REG_CONST = 0.0001
-LEARNING_RATE = 0.1
-MOMENTUM = 0.9
-HIDDEN_CNN_LAYERS = [  # (AZ: 40 layers, 256 filters, 3x3 kernel)
-    {'filters': 75, 'kernel_size': (4, 4)},
-    {'filters': 75, 'kernel_size': (4, 4)},
-    {'filters': 75, 'kernel_size': (4, 4)},
-    {'filters': 75, 'kernel_size': (4, 4)},
-    {'filters': 75, 'kernel_size': (4, 4)},
-    {'filters': 75, 'kernel_size': (4, 4)}]
+# Classic MCTS
+CLASSIC_MCTS_SIMULATIONS = 1000
+CLASSIC_C_PUCT = 1.41
+
+# Logging
+LOG_DISABLED = {'train': False, 'eval': False, 'mcts': True}
