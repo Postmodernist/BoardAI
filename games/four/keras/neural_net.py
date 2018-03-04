@@ -15,7 +15,7 @@ from .model_builder import build_model
 class NeuralNet(INeuralNet):
 
     def __init__(self):
-        if False:  # choose model
+        if True:  # choose model
             self.model = build_model(Game.BOARD_SHAPE, Game.ACTION_SIZE)
         else:
             self.model = build_model2(Game.BOARD_SHAPE, Game.ACTION_SIZE)
