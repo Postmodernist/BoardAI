@@ -2,7 +2,7 @@
 GAME = 'four'
 N = 6  # length of the board side
 
-# Memory and model loading parameters
+# Memory and model loading parameters (see utils/paths.py for format description)
 LOAD_DIR_NUMBER = None
 MEMORY_VERSION = None
 MODEL_VERSION = None
