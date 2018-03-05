@@ -32,8 +32,7 @@ class IGameState:
 
     def get_valid_actions(self):
         """
-        :return valid_actions: a binary vector of length ACTION_SIZE, 1 for moves that are
-            valid from the current board and player, 0 for invalid moves
+        :return valid_actions: a set of valid actions
         """
         pass
 

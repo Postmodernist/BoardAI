@@ -21,15 +21,14 @@ class Human(IPlayer):
     def get_name(self) -> str:
         return self._name
 
-    def get_action(self, state: IGameState) -> int:
+    def get_action(self, state: IGameState) -> (int, np.ndarray):
         valid_actions = state.get_valid_actions()
         print(valid_actions)
         while True:
             action = int(input(': '))
-            if action not in valid_actions:
-                print('Invalid action')
-            else:
-                return action
+            if action in valid_actions:
+                return action, None
+            print('Invalid action')
 
 
 class ClassicMctsAgent(IPlayer):

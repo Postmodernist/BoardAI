@@ -45,16 +45,16 @@ class NeuralNet(INeuralNet):
         self._value_loss.extend(fit.history['v_loss'])
         self._plot_train_losses()
 
-    def predict(self, canonical_board: np.ndarray, valid_actions: list):
+    def predict(self, canonical_board: np.ndarray, valid_actions: set):
         """
         :param canonical_board: current board in its canonical form
-        :param valid_actions: a list of valid actions
+        :param valid_actions: a set of valid actions
         """
         canonical_board = canonical_board[np.newaxis, :, :]
         pi, v = self.model.predict(canonical_board)
         pi = pi[0]
         valid_actions_mask = np.zeros(Game.ACTION_SIZE, dtype=np.int)
-        valid_actions_mask[valid_actions] = 1
+        valid_actions_mask[list(valid_actions)] = 1
         pi *= valid_actions_mask  # mask invalid actions
         if np.nonzero(pi)[0].size == 0:
             pi += valid_actions_mask  # zero or masked predictions, working around

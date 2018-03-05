@@ -83,7 +83,7 @@ class MctsClassic:
         # Random descent until game is finished
         while not state.is_game_finished():
             # Make random move
-            action = random.choice(state.get_valid_actions())
+            action = random.choice(list(state.get_valid_actions()))
             state = state.get_next_state(action)
         return state.get_value() if state.get_player() == player else -state.get_value()
 

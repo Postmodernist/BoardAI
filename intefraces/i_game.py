@@ -8,7 +8,7 @@ class IGame:
     """
 
     BOARD_SHAPE = (None, None)  # shape of the board
-    BOARD_SIZE = None  # number of board cells
+    BOARD_SIZE = None  # number of board squares
     ACTION_SIZE = None  # number of all possible actions
 
     @staticmethod

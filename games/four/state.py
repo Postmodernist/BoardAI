@@ -1,17 +1,17 @@
 import numpy as np
 
 from intefraces.i_game_state import IGameState
-from .logic import BOARD_SHAPE, PIECES, get_valid_actions, is_player_won
+from .logic import BOARD_SHAPE, PIECES, update_valid_actions, is_player_won
 
 
 class State(IGameState):
 
-    def __init__(self, board: np.ndarray, player: int, turn: int = 0):
+    def __init__(self, board: np.ndarray, player: int, turn: int = 0, valid_actions: set = None, action: int = -1):
         self._board = board
         self._player = player
         self._turn = turn
-        self._valid_actions = get_valid_actions(board)
-        self._opponent_won = is_player_won(board, -player)
+        self._valid_actions = update_valid_actions(board, valid_actions, action)
+        self._opponent_won = False if action == -1 else is_player_won(board, -player, action)
         self._finished = len(self._valid_actions) == 0 or self._opponent_won
         self._value = -1 if self._opponent_won else 0
 
@@ -27,13 +27,14 @@ class State(IGameState):
     def get_turn(self) -> int:
         return self._turn
 
-    def get_valid_actions(self) -> np.ndarray:
+    def get_valid_actions(self) -> set:
         return self._valid_actions
 
     def get_next_state(self, action: int) -> IGameState:
         next_board = self._board.copy()
         next_board[action] = self._player
-        return State(next_board, -self._player, self._turn + 1)
+        valid_actions = self._valid_actions.copy()
+        return State(next_board, -self._player, self._turn + 1, valid_actions, action)
 
     def is_game_finished(self) -> bool:
         return self._finished

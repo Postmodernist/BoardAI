@@ -81,8 +81,7 @@ class Evaluate:
         self._player1, self._player2 = self._player2, self._player1
         play_half_episodes(episodes // 2)
         # Write results
-        if self._verbose:
-            name1 = self._player1.get_name()
-            name2 = self._player2.get_name()
-            print('{} / {} / draw -- {}/{}/{}'.format(name1, name2, wins[name1], wins[name2], wins['draw']))
+        name1 = self._player1.get_name()
+        name2 = self._player2.get_name()
+        print('{} / {} / draw -- {}/{}/{}'.format(name1, name2, wins[name1], wins[name2], wins['draw']))
         return wins

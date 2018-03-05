@@ -9,91 +9,100 @@ INDEX_BOARD = np.arange(BOARD_SIZE)
 PIECES = {1: 'A', -1: 'B', 0: '.'}
 
 
-def get_win_positions():
-    """ Get all possible win combinations for the board """
-
-    def get_rows(board: np.ndarray):
-        """ All rows, columns and diagonals of the board """
-        board = board.reshape(BOARD_SHAPE)
-        board_flip = np.fliplr(board)
-        rows = [board[0]]
-        cols = [board[:, 0]]
-        diagonals1 = [board.diagonal(0)]
-        diagonals2 = [board_flip.diagonal(0)]
-        for i in range(1, N):
-            rows.append(board[i])
-            cols.append(board[:, i])
-            if N - i >= 4:
-                diagonals1.append(board.diagonal(i))
-                diagonals1.append(board.diagonal(-i))
-                diagonals2.append(board_flip.diagonal(i))
-                diagonals2.append(board_flip.diagonal(-i))
-        return rows + cols + diagonals1 + diagonals2
-
-    win_positions = []
-    for row in get_rows(INDEX_BOARD):
-        win_positions.extend([row[j:j + 4] for j in range(len(row) - 3)])
-    return win_positions
-
-
-WIN_POSITIONS = get_win_positions()
-
-
-def is_border(pos: int):
+def is_border(square: int) -> bool:
     """
-    :return True if pos is the border cell
+    :return: True if square is on the border of the board
     """
-    rem = pos % N
-    return pos < N or pos >= BOARD_SIZE - N or rem == 0 or rem == N - 1
+    rem = square % N
+    return square < N or square >= BOARD_SIZE - N or rem == 0 or rem == N - 1
 
 
 BORDER_POSITIONS = set(filter(is_border, INDEX_BOARD))
 
 
-def get_neighbors():
+def get_neighbors() -> dict:
     """
-     :return neighbors: indexes of neighbors for each inner cell
+     :return: dict of neighbors of each square
      """
     neighbors = {}
-    for i in filter(lambda x: x not in BORDER_POSITIONS, INDEX_BOARD):
-        neighbors[i] = [i - 1, i + 1, i - N, i + N, i - N - 1, i - N + 1, i + N - 1, i + N + 1]
+    for i in INDEX_BOARD:
+        if i == 0:  # upper left corner
+            neighbors[i] = [i + 1, i + N, i + N + 1]
+        elif i == N - 1:  # upper right corner
+            neighbors[i] = [i - 1, i + N - 1, i + N]
+        elif i == N * (N - 1):  # lower left corner
+            neighbors[i] = [i - N, i - N + 1, i + 1]
+        elif i == N * N - 1:  # lower right corner
+            neighbors[i] = [i - N - 1, i - N, i - 1]
+        elif i < N:  # upper row
+            neighbors[i] = [i - 1, i + 1, i + N - 1, i + N, i + N + 1]
+        elif i > N * (N - 1):  # lower row
+            neighbors[i] = [i - N - 1, i - N, i - N + 1, i - 1, i + 1]
+        elif i % N == 0:  # left column
+            neighbors[i] = [i - N, i - N + 1, i + 1, i + N, i + N + 1]
+        elif i % N == N - 1:  # right column
+            neighbors[i] = [i - N - 1, i - N, i - 1, i + N - 1, i + N]
+        else:  # inner squares
+            neighbors[i] = [i - N - 1, i - N, i - N + 1, i - 1, i + 1, i + N - 1, i + N, i + N + 1]
     return neighbors
 
 
 NEIGHBORS = get_neighbors()
 
 
-def get_valid_actions(board: np.ndarray):
+def update_valid_actions(board: np.ndarray, valid_actions: set, action: int) -> set:
     """
-    :return a list of valid actions
+    :return: a list of valid actions
     """
-
-    def is_valid_action(action: int):
-        """
-        :return: True if action is valid
-        """
-        # Cell is not empty
-        if board[action] != 0:
-            return False
-        # Border cell
-        if action in BORDER_POSITIONS:
-            return True
-        # Cell has non-empty neighbor
-        for x in NEIGHBORS[action]:
-            if board[x]:
-                return True
-        return False
-
-    return list(filter(is_valid_action, INDEX_BOARD))
+    if valid_actions is None:
+        return BORDER_POSITIONS.copy()
+    valid_actions.remove(action)
+    new_actions = []
+    for a in NEIGHBORS[action]:
+        if board[a] == 0:
+            new_actions.append(a)
+    valid_actions.update(new_actions)
+    return valid_actions
 
 
-def is_player_won(board: np.ndarray, player: int):
+def get_win_segments() -> dict:
     """
-    :return True if player has a winning combination
+    :return: dict of all possible win segments of each square of the board """
+
+    def get_segments(i):
+        row = [[i + k + l for k in range(4)] for l in range(-3, 1)]
+        column = [[i + N * (k + l) for k in range(4)] for l in range(-3, 1)]
+        diagonal1 = [[i + (N + 1) * (k + l) for k in range(4)] for l in range(-3, 1)]
+        diagonal2 = [[i + (N - 1) * (k + l) for k in range(4)] for l in range(-3, 1)]
+        return row + column + diagonal1 + diagonal2
+
+    def is_valid(segment):
+        # Out of bounds
+        for i in segment:
+            if i < 0 or i >= BOARD_SIZE:
+                return False
+        # Tearing
+        for i in range(3):
+            if abs(segment[i] % N - segment[i + 1] % N) > 1:
+                return False
+        return True
+
+    win_segments = {}
+    for square in INDEX_BOARD:
+        win_segments[square] = list(filter(is_valid, get_segments(square)))
+    return win_segments
+
+
+WIN_SEGMENTS = get_win_segments()
+
+
+def is_player_won(board: np.ndarray, player: int, action: int) -> bool:
     """
-    for win_position in WIN_POSITIONS:
+    :return: True if player has 4 pieces in a row
+    """
+    for segment in WIN_SEGMENTS[action]:
         failed = False
-        for i in win_position:
+        for i in segment:
             if board[i] != player:
                 failed = True
                 break
@@ -103,9 +112,10 @@ def is_player_won(board: np.ndarray, player: int):
 
 
 def get_symmetries(board: np.ndarray, pi: np.ndarray) -> list:
-    """ Generate 8 symmetries of board and pi
+    """
     :param board: reshaped board
     :param pi: probability distribution vector
+    :return: 8 symmetries of board and pi
     """
 
     def make_symmetry(a, b):
