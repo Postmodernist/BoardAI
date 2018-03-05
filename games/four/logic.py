@@ -17,7 +17,7 @@ def is_border(square: int) -> bool:
     return square < N or square >= BOARD_SIZE - N or rem == 0 or rem == N - 1
 
 
-BORDER_POSITIONS = set(filter(is_border, INDEX_BOARD))
+BORDER_SQUARES = set(filter(is_border, INDEX_BOARD))
 
 
 def get_neighbors() -> dict:
@@ -55,7 +55,7 @@ def update_valid_actions(board: np.ndarray, valid_actions: set, action: int) -> 
     :return: a list of valid actions
     """
     if valid_actions is None:
-        return BORDER_POSITIONS.copy()
+        return BORDER_SQUARES.copy()
     valid_actions.remove(action)
     new_actions = []
     for a in NEIGHBORS[action]:
