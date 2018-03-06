@@ -33,8 +33,9 @@ class Human(IPlayer):
 
 class ClassicMctsAgent(IPlayer):
 
-    def __init__(self, name: str, pi_turns: int = 0, verbose: bool = True):
+    def __init__(self, name: str, simulations: int, pi_turns: int = 0, verbose: bool = True):
         self._name = name
+        self._simulations = simulations
         self._pi_turns = pi_turns
         self._verbose = verbose
         self._mcts = MctsClassic()
@@ -43,7 +44,7 @@ class ClassicMctsAgent(IPlayer):
         return self._name
 
     def get_action(self, state: IGameState) -> (int, np.ndarray):
-        pi = self._mcts.get_distribution(state, self._verbose)
+        pi = self._mcts.get_distribution(state, self._simulations, self._verbose)
         if state.get_turn() >= self._pi_turns:
             # Choose action deterministically
             candidates = np.nonzero(pi == max(pi))[0]
@@ -59,17 +60,18 @@ class ClassicMctsAgent(IPlayer):
 
 class MctsAgent(IPlayer):
 
-    def __init__(self, name: str, nnet: INeuralNet, simulations: int, pi_turns: int):
+    def __init__(self, name: str, nnet: INeuralNet, simulations: int, pi_turns: int, verbose: bool = False):
         self._name = name
         self._simulations = simulations
         self._pi_turns = pi_turns
+        self._verbose = verbose
         self._mcts = Mcts(nnet)
 
     def get_name(self):
         return self._name
 
     def get_action(self, state) -> (int, np.ndarray):
-        pi = self._mcts.get_distribution(state, self._simulations)
+        pi = self._mcts.get_distribution(state, self._simulations, self._verbose)
         if state.get_turn() >= self._pi_turns:
             # Choose action deterministically
             candidates = np.nonzero(pi == max(pi))[0]
@@ -95,13 +97,13 @@ def build_player(name: str, player_class: type, **kwargs) -> IPlayer:
     if player_class == Human:
         player = Human(name)
     elif player_class == ClassicMctsAgent:
-        player = ClassicMctsAgent(name, kwargs['pi_turns'], kwargs['verbose'])
+        player = ClassicMctsAgent(name,kwargs['simulations'], kwargs['pi_turns'], kwargs['verbose'])
     elif player_class == MctsAgent:
         nnet = NeuralNet.create()
-        folder = str(Path(ARCHIVE_DIR, GAME, '{:04}'.format(kwargs['dir_number'])))
-        name = 'model{:04}.h5'.format(kwargs['model_version'])
-        nnet.load(folder, name)
-        player = MctsAgent(name, nnet, kwargs['simulations'], kwargs['pi_turns'])
+        load_folder = str(Path(ARCHIVE_DIR, GAME, '{:04}'.format(kwargs['dir_number'])))
+        load_name = 'model{:04}.h5'.format(kwargs['model_version'])
+        nnet.load(load_folder, load_name)
+        player = MctsAgent(name, nnet, kwargs['simulations'], kwargs['pi_turns'], kwargs['verbose'])
     else:
         player = None
     return player

@@ -7,6 +7,7 @@ from intefraces.i_game_state import IGameState
 from intefraces.i_neural_net import INeuralNet
 from utils.loaders import Game
 from utils.loggers import mcts as log
+from utils.progress import progress_bar
 
 
 class Node:
@@ -34,10 +35,11 @@ class Mcts:
         self._tree = {}
         self._root = None
 
-    def get_distribution(self, state: IGameState, simulations: int) -> np.ndarray:
+    def get_distribution(self, state: IGameState, simulations: int, verbose=False) -> np.ndarray:
         """ Perform MCTS simulations starting from current game state.
         :param state: root game state
         :param simulations: number of simulations
+        :param verbose: print progress info
         :return visit_counts: a vector of probability distribution over all actions
         """
         # Set root node
@@ -50,6 +52,8 @@ class Mcts:
         for i in range(simulations):
             log.info('********** Simulation {} **********'.format(i + 1))
             self._simulate()
+            if verbose:
+                progress_bar(i + 1, simulations, 'Exploring tree')
         # Return visit counts
         visit_counts = np.zeros(Game.ACTION_SIZE, dtype=np.integer)
         for edge in self._root.edges:

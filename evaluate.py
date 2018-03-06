@@ -36,9 +36,9 @@ class Evaluate:
             # Switch player
             player, opponent = opponent, player
         if state.get_value() == -1:
-            self._logger.info('Game over | Player {} ({}) won'.format(-state.get_player(), opponent.get_name()))
+            self._logger.info('Game over | Player {} ({}) WINS'.format(-state.get_player(), opponent.get_name()))
         else:
-            self._logger.info('Game over | Draw')
+            self._logger.info('Game over | DRAW')
         return state
 
     def batch(self, episodes: int, prefix: str = '') -> dict:

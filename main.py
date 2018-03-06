@@ -87,9 +87,10 @@ def learn():
 
 def play_custom():
     """ Play versus agent or pit two agents against each other """
-    episodes = 2
-    player1 = build_player('Alex', Human)
-    player2 = build_player('Botik', ClassicMctsAgent, pi_turns=0, verbose=True)
+    episodes = 10
+    player0 = build_player('Human', Human)
+    player1 = build_player('Botik', ClassicMctsAgent, simulations=5000, pi_turns=0, verbose=True)
+    player2 = build_player('AI', MctsAgent, dir_number=1, model_version=6, simulations=500, pi_turns=0, verbose=True)
     Evaluate(player1, player2, console_log, verbose=False).batch(episodes, 'Custom matchup')
 
 

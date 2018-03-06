@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 
-from config import CLASSIC_MCTS_SIMULATIONS as SIMULATIONS, CLASSIC_C_PUCT as C_PUCT
+from config import CLASSIC_C_PUCT as C_PUCT
 from intefraces.i_game_state import IGameState
 from utils.loaders import Game
 from utils.progress import progress_bar
@@ -33,7 +33,7 @@ class MctsClassic:
         self._tree = {}
         self._root = None
 
-    def get_distribution(self, state: IGameState, verbose=True) -> np.ndarray:
+    def get_distribution(self, state: IGameState, simulations:int, verbose=True) -> np.ndarray:
         """ Perform MCTS simulations starting from current game state.
         :param state: root game state
         :param verbose: print progress info
@@ -46,10 +46,10 @@ class MctsClassic:
             self._root = self._tree[state.get_hashable()]
             self._prune_tree(self._root)
         # Explore the tree
-        for i in range(SIMULATIONS):
+        for i in range(simulations):
             self._simulate()
             if verbose:
-                progress_bar(i + 1, SIMULATIONS, 'Exploring tree')
+                progress_bar(i + 1, simulations, 'Exploring tree')
         # Return pi
         visit_counts = np.zeros(Game.ACTION_SIZE, dtype=np.integer)
         for edge in self._root.edges:
