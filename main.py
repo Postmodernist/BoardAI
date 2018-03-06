@@ -56,14 +56,14 @@ def learn():
     evaluate = Evaluate(best_agent, adversary_agent)
     iteration = 0
 
-    # Make first self-play iteration if needed
-    if len(memory) == 0:
-        iteration += 1
-        self_play.batch(config.SELF_PLAY_EPISODES, memory, 'Self-play (iter {})'.format(iteration))
-        memory.save(TEMP_DIR, 'memory{:04}.pickle'.format(iteration))
-
     while True:
         reload(config)
+        # Self-play
+        iteration += 1
+        best_agent.set_simulations(config.MCTS_TRAIN_SIMULATIONS)
+        best_agent.set_pi_turns(config.STOCHASTIC_TURNS)
+        self_play.batch(config.SELF_PLAY_EPISODES, memory, 'Self-play (iter {})'.format(iteration))
+        memory.save(TEMP_DIR, 'memory{:04}.pickle'.format(iteration))
         # Train
         examples = list(memory.long)
         random.shuffle(examples)
@@ -83,12 +83,6 @@ def learn():
             best_nn.model.set_weights(adversary_nn.model.get_weights())
             model_version += 1
             best_nn.save(TEMP_DIR, 'model{:04}.h5'.format(model_version))
-        # Self-play
-        iteration += 1
-        best_agent.set_simulations(config.MCTS_TRAIN_SIMULATIONS)
-        best_agent.set_pi_turns(config.STOCHASTIC_TURNS)
-        self_play.batch(config.SELF_PLAY_EPISODES, memory, 'Self-play (iter {})'.format(iteration))
-        memory.save(TEMP_DIR, 'memory{:04}.pickle'.format(iteration))
 
 
 def play_custom():
