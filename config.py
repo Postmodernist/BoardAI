@@ -1,6 +1,6 @@
 # Game
 GAME = 'four'
-N = 6  # length of the board side
+N = 7  # length of the board side
 
 # Memory and model loading parameters (see utils/paths.py for format description)
 LOAD_DIR_NUMBER = None
@@ -26,9 +26,9 @@ KERAS2_FILTERS = 256
 KERAS2_KERNEL_SIZE = 3
 
 # Training
-SELF_PLAY_EPISODES = 100
+SELF_PLAY_EPISODES = 500
 STOCHASTIC_TURNS = 15
-MCTS_TRAIN_SIMULATIONS = 1600
+MCTS_TRAIN_SIMULATIONS = 1000
 MCTS_COMPETITIVE_SIMULATIONS = 1000
 C_PUCT = 1.41
 ALPHA = 0.8  # dirichlet noise parameter
@@ -38,7 +38,7 @@ EVAL_THRESHOLD = 0.6
 MEMORY_SIZE = 200000
 
 # Classic MCTS
-CLASSIC_C_PUCT = 1.41
+CLASSIC_C_UCT = 1.41
 
 # Logging
 LOG_DISABLED = {'train': False, 'eval': False, 'mcts': True}

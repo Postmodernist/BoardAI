@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 
-from config import CLASSIC_C_PUCT as C_PUCT
+from config import CLASSIC_C_UCT as C_UCT
 from intefraces.i_game_state import IGameState
 from utils.loaders import Game
 from utils.progress import progress_bar
@@ -120,7 +120,7 @@ class MctsClassic:
         for edge in node.edges:
             if edge.stats['N'] == 0:
                 return edge
-            u = edge.stats['Q'] + C_PUCT * (math.log(total_visits) / edge.stats['N']) ** 0.5
+            u = edge.stats['Q'] + C_UCT * (math.log(total_visits) / edge.stats['N']) ** 0.5
             if u > max_u:
                 max_u = u
                 best_edge = edge
