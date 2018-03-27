@@ -97,7 +97,7 @@ def build_player(name: str, player_class: type, **kwargs) -> IPlayer:
     if player_class == Human:
         player = Human(name)
     elif player_class == ClassicMctsAgent:
-        player = ClassicMctsAgent(name,kwargs['simulations'], kwargs['pi_turns'], kwargs['verbose'])
+        player = ClassicMctsAgent(name, kwargs['simulations'], kwargs['pi_turns'], kwargs['verbose'])
     elif player_class == MctsAgent:
         nnet = NeuralNet.create()
         load_folder = str(Path(ARCHIVE_DIR, GAME, '{:04}'.format(kwargs['dir_number'])))

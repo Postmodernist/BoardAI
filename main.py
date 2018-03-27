@@ -89,10 +89,10 @@ def play_custom():
     """ Play versus agent or pit two agents against each other """
     episodes = 40
     player0 = build_player('Human', Human)
-    player1 = build_player('Botik', ClassicMctsAgent, simulations=10000, pi_turns=0, verbose=True)
-    player2 = build_player('AI-1600', MctsAgent, dir_number=10, model_version=5, simulations=500, pi_turns=0, verbose=True)
-    player3 = build_player('AI-500', MctsAgent, dir_number=1, model_version=6, simulations=500, pi_turns=0, verbose=True)
-    Evaluate(player2, player3, console_log, verbose=False).batch(episodes, 'Custom matchup')
+    player1 = build_player('Botik', ClassicMctsAgent, simulations=50000, pi_turns=0, verbose=True)
+    player2 = build_player('AI-1000', MctsAgent, dir_number=21, model_version=7, simulations=1000, pi_turns=0,
+                           verbose=True)
+    Evaluate(player1, player2, console_log, verbose=False).batch(episodes, 'Custom matchup')
 
 
 if __name__ == '__main__':
