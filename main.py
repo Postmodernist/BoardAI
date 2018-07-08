@@ -90,9 +90,11 @@ def play_custom():
     episodes = 40
     player0 = build_player('Human', Human)
     player1 = build_player('Botik', ClassicMctsAgent, simulations=50000, pi_turns=0, verbose=True)
-    player2 = build_player('AI-1000', MctsAgent, dir_number=21, model_version=7, simulations=1000, pi_turns=0,
+    player2 = build_player('AI-Hel', MctsAgent, dir_number=21, model_version=7, simulations=1000, pi_turns=0,
                            verbose=True)
-    Evaluate(player1, player2, console_log, verbose=False).batch(episodes, 'Custom matchup')
+    player3 = build_player('AI-Hel2', MctsAgent, dir_number=30, model_version=12, simulations=1000, pi_turns=0,
+                           verbose=True)
+    Evaluate(player2, player3, console_log, verbose=False).batch(episodes, 'Custom matchup')
 
 
 if __name__ == '__main__':
