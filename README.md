@@ -36,7 +36,7 @@ Let's go through each of them briefly.
 
 * `IGame` is a static utility class. It contains a method for retrieving an initial game state and
 a method for building symmetries of the board state. If there are no symmetries then it must return
-a list containing a single (board state, pi) tuple. It also contain static game data like board
+a list containing a single (board state, pi) tuple. It also contains static game data like board
 size and action space size.
 * `IGameState` represents a current state of the game and contains methods responsible for making
 turns and retrieving various state data.
