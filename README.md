@@ -1,7 +1,8 @@
 # Board games AI
 
 The goal of this project is to create on agent that can, given a board game rules, learn to play it
-on expert level by cycles of self playing and model retraining, i.e. replicating an AlphaZero algorithm.
+on expert level by cycles of self playing and model retraining, i.e. replicating an AlphaZero
+algorithm.
 
 ## Dependencies
 
@@ -14,12 +15,10 @@ on expert level by cycles of self playing and model retraining, i.e. replicating
 The program can run in two modes: learning and custom play. Learning mode is for training the model
 while custom play mode is for testing the model.
 
-1. To run existing example choose 'Learn' build configuration or run `$ python3 main.py`. It will
-start training a new model to play the 'four' game. Learning process will continue indefinitely
-until manually interrupted.
-2. To test the model choose 'Custom play' build configuration or run `$ python3 main.py 1`. This
-will run an interactive playing session between players defined in `play_custom()` function.
-Each player can be either human or AI.
+1. To use existing example run `$ python3 main.py`. It will start training a new model to play the
+'four' game. Learning process will continue indefinitely until manually interrupted.
+2. To test the model run `$ python3 main.py 1`. This will run an interactive playing session
+between players defined in `play_custom()` function. Each player can be either human or AI.
 
 Things worth noting about training process:
 * A memory cache is saved each cycle and can be reused along with the model in future training
@@ -47,7 +46,7 @@ factory for creating instances.
 
 ## Exporting a model
 
-Configure the `utils/export.py` by setting the variables at the top of the file then run it. The
+Configure the `utils/export.py` by setting the variables at the top of the file, then run it. The
 `MODEL_VERSION` and `DIR_NUMBER` use the same conventions as described in `utils/paths.py`.
 
 ## License
